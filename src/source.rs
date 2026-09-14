@@ -28,6 +28,17 @@ use crate::ProjectConfig;
 /// # Examples
 ///
 /// Baselines are loaded from a fixed project configuration revision.
+///
+/// ```
+/// use qubit_infra_dependency::{Baseline, LoadedBaseline};
+///
+/// let loaded = LoadedBaseline {
+///     commit: "0123456789abcdef0123456789abcdef01234567".into(),
+///     release: "v2026.09.0".into(),
+///     baseline: Baseline::parse("serde 1.0\n").expect("valid baseline"),
+/// };
+/// assert_eq!(loaded.release, "v2026.09.0");
+/// ```
 #[derive(Debug, Clone)]
 pub struct LoadedBaseline {
     /// Commit SHA recorded by the project configuration.
@@ -127,6 +138,7 @@ fn git_cache_name(source: &str) -> String {
 }
 
 /// Runs Git in an existing repository and returns trimmed UTF-8 stdout.
+#[inline]
 fn run_git(repository: &Utf8Path, arguments: &[&str]) -> Result<String, PolicyError> {
     run_git_in(repository, arguments)
 }

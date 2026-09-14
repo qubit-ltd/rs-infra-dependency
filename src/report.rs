@@ -17,6 +17,19 @@ use crate::PolicyError;
 // qubit-style: allow multiple-public-types
 
 /// Stable identity of the baseline used for a report.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_infra_dependency::BaselineIdentity;
+///
+/// let identity = BaselineIdentity {
+///     release: "v2026.09.0".into(),
+///     revision: "0123456789abcdef0123456789abcdef01234567".into(),
+///     name: "v2026.09.0".into(),
+/// };
+/// assert_eq!(identity.release, "v2026.09.0");
+/// ```
 #[derive(Debug, Clone, Serialize)]
 pub struct BaselineIdentity {
     /// Baseline release name.

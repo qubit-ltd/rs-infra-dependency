@@ -20,6 +20,22 @@ use crate::PolicyError;
 // qubit-style: allow multiple-public-types
 
 /// A dependency declared by a package in an inventory scan.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_infra_dependency::InventoryDependency;
+///
+/// let dependency = InventoryDependency {
+///     package: "example".into(),
+///     name: "serde".into(),
+///     requirement: Some("1.0".into()),
+///     source: "registry-or-git".into(),
+///     kind: "normal".into(),
+///     optional: false,
+/// };
+/// assert!(!dependency.optional);
+/// ```
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct InventoryDependency {
     /// Package declaring the dependency.
@@ -37,6 +53,21 @@ pub struct InventoryDependency {
 }
 
 /// A package resolved while scanning one project root.
+///
+/// # Examples
+///
+/// ```
+/// use camino::Utf8PathBuf;
+/// use qubit_infra_dependency::InventoryProject;
+///
+/// let project = InventoryProject {
+///     project: Utf8PathBuf::from("."),
+///     packages: Vec::new(),
+///     dependencies: Vec::new(),
+///     resolved: Vec::new(),
+/// };
+/// assert!(project.packages.is_empty());
+/// ```
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct InventoryProject {
     /// Project root.

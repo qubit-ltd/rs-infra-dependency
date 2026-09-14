@@ -26,6 +26,26 @@ use crate::render_json;
 use crate::render_markdown;
 use crate::scan_projects;
 
+/// Runs the command-line interface for either the native binary or the
+/// compatibility Cargo subcommand.
+pub fn run_cli(mut arguments: Vec<std::ffi::OsString>) {
+    if arguments
+        .get(1)
+        .is_some_and(|argument| argument == "dependency-policy")
+    {
+        arguments.remove(1);
+    }
+    let cli = Cli::parse_from(arguments);
+    if let Err(error) = cli.execute() {
+        eprintln!("{error}");
+        std::process::exit(if matches!(error.code(), "DP001" | "DP101") {
+            1
+        } else {
+            2
+        });
+    }
+}
+
 // qubit-style: allow multiple-public-types
 
 /// Command-line arguments for rs-infra-dependency.
@@ -58,6 +78,15 @@ pub struct Cli {
 }
 
 /// Supported policy operations.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_infra_dependency::cli::Command;
+///
+/// let command = Command::Check;
+/// assert!(matches!(command, Command::Check));
+/// ```
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// Inventory direct declarations and resolved graphs across project roots.
@@ -89,6 +118,14 @@ pub enum Command {
 }
 
 /// Output formats supported by report.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_infra_dependency::cli::ReportFormat;
+///
+/// assert!(matches!(ReportFormat::Json, ReportFormat::Json));
+/// ```
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum ReportFormat {
     /// Human-readable Markdown.

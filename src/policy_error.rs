@@ -9,6 +9,15 @@
 //! Errors returned by policy loading, evaluation, and synchronization.
 
 /// Errors returned while loading or validating policy configuration.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_infra_dependency::PolicyError;
+///
+/// let error = PolicyError::Unsupported { message: "demo".into() };
+/// assert_eq!(error.code(), "DP105");
+/// ```
 #[derive(Debug, thiserror::Error)]
 pub enum PolicyError {
     /// The project configuration file could not be read.
@@ -90,6 +99,7 @@ pub enum PolicyError {
 impl PolicyError {
     /// Returns the stable diagnostic code for this error.
     #[must_use]
+    #[inline]
     pub fn code(&self) -> &'static str {
         match self {
             Self::ReadConfig { .. } | Self::ParseConfig { .. } => "DP001",

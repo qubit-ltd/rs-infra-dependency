@@ -19,6 +19,19 @@ use crate::PolicyError;
 // qubit-style: allow type-file-name
 
 /// A resolved package represented in a policy report.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_infra_dependency::ResolvedPackage;
+///
+/// let package = ResolvedPackage {
+///     name: "serde".into(),
+///     version: semver::Version::parse("1.0.0").expect("valid version"),
+///     source: Some("registry+https://github.com/rust-lang/crates.io-index".into()),
+/// };
+/// assert_eq!(package.name, "serde");
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ResolvedPackage {
     /// Package name.

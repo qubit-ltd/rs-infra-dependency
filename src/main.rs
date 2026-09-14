@@ -8,7 +8,11 @@
 
 //! Native entry point for rs-infra-dependency.
 
+use std::env;
+
+use qubit_infra_dependency::run_cli;
+
 /// Parses command-line arguments and executes the selected policy operation.
 fn main() {
-    qubit_infra_dependency::run_cli(std::env::args_os().collect());
+    run_cli(env::args_os().collect());
 }
