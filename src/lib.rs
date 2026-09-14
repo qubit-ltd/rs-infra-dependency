@@ -6,7 +6,10 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Public library API for loading a dependency-policy project configuration.
+//! Public library API for checking and synchronizing direct Rust dependencies.
+//!
+//! The crate loads a project policy pointer, resolves its pinned baseline, and
+//! exposes evaluation, reporting, inventory, and manifest-synchronization APIs.
 
 pub mod baseline;
 pub mod cargo;

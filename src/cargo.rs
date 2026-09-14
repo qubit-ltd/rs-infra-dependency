@@ -34,11 +34,11 @@ use crate::PolicyError;
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ResolvedPackage {
-    /// Package name.
+    /// Cargo package name used in reports and diagnostics.
     pub name: String,
-    /// Resolved package version.
+    /// Version selected by Cargo for this package.
     pub version: semver::Version,
-    /// Registry or Git source, if any.
+    /// Registry, Git, or path source identifier, when Cargo reports one.
     pub source: Option<String>,
 }
 

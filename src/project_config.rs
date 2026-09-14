@@ -47,6 +47,24 @@ pub struct ProjectConfig {
 
 impl ProjectConfig {
     /// Loads and validates the project policy configuration.
+    ///
+    /// When `override_path` is `None`, this reads
+    /// `.infra/dep/policy.toml` below `project_root`; otherwise it reads the
+    /// explicitly supplied path.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`PolicyError`] when the file cannot be read, its TOML is
+    /// invalid, or the parsed values violate the configuration contract.
+    ///
+    /// # Parameters
+    ///
+    /// * `project_root` - Project directory containing the default policy path.
+    /// * `override_path` - Optional explicit configuration path.
+    ///
+    /// # Returns
+    ///
+    /// Returns the validated project configuration.
     pub fn load(
         project_root: &Utf8Path,
         override_path: Option<&Utf8Path>,
@@ -68,6 +86,17 @@ impl ProjectConfig {
     }
 
     /// Returns whether a Cargo metadata dependency is first-party.
+    ///
+    /// Path dependencies, workspace dependencies, and names matching one of
+    /// the configured internal prefixes are treated as first-party.
+    ///
+    /// # Parameters
+    ///
+    /// * `dependency` - Cargo metadata dependency to classify.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when the dependency is treated as first-party.
     #[must_use]
     #[inline]
     pub fn is_internal_dependency(&self, dependency: &cargo_metadata::Dependency) -> bool {

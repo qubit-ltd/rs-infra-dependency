@@ -24,6 +24,24 @@ mod evaluation;
 pub use evaluation::Evaluation;
 
 /// Evaluates external direct dependencies against the selected baseline.
+///
+/// Internal, path, and workspace dependencies are excluded according to
+/// `config`. The returned package list is the Cargo metadata projection used by
+/// reports, while violations describe only direct external declarations.
+///
+/// # Errors
+///
+/// Returns [`PolicyError::Cargo`] when Cargo metadata cannot be loaded.
+///
+/// # Parameters
+///
+/// * `project` - Cargo project root whose direct dependencies are evaluated.
+/// * `config` - Configuration controlling first-party dependency classification.
+/// * `baseline` - Loaded policy baseline used for requirement comparisons.
+///
+/// # Returns
+///
+/// Returns the violations and resolved packages observed for the project.
 pub fn evaluate(
     project: &Utf8Path,
     config: &ProjectConfig,

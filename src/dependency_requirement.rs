@@ -26,12 +26,24 @@ use semver::VersionReq;
 /// ```
 #[derive(Debug, Clone)]
 pub struct DependencyRequirement {
+    /// Original requirement text as it appeared in the baseline.
+    ///
+    /// This is retained so reports and synchronization plans can reproduce the
+    /// policy's chosen spelling rather than formatting the parsed requirement.
     pub(crate) text: String,
+    /// Parsed semantic-version requirement used for comparisons.
     pub(crate) version: VersionReq,
 }
 
 impl DependencyRequirement {
     /// Returns the original Cargo requirement text from the baseline.
+    ///
+    /// The returned string is borrowed from this requirement and is suitable
+    /// for displaying or writing the policy's exact spelling.
+    ///
+    /// # Returns
+    ///
+    /// Returns the baseline text without allocating a new string.
     #[must_use]
     #[inline]
     pub fn text(&self) -> &str {
@@ -39,6 +51,13 @@ impl DependencyRequirement {
     }
 
     /// Returns the parsed Cargo requirement used for comparisons.
+    ///
+    /// The returned value borrows the parsed requirement and performs no
+    /// allocation.
+    ///
+    /// # Returns
+    ///
+    /// Returns the parsed semantic-version requirement.
     #[must_use]
     #[inline]
     pub fn version(&self) -> &VersionReq {

@@ -72,7 +72,20 @@ pub struct Report {
 }
 
 impl Report {
-    /// Builds a report from an evaluation and its baseline.
+    /// Builds a report from an evaluation and its selected baseline.
+    ///
+    /// The evaluation is consumed because its violations and resolved package
+    /// records become owned report fields. The baseline identity is copied into
+    /// the report so the result remains self-contained.
+    ///
+    /// # Parameters
+    ///
+    /// * `evaluation` - Evaluation result to move into the report.
+    /// * `baseline` - Loaded baseline whose identity is copied.
+    ///
+    /// # Returns
+    ///
+    /// Returns a report with schema version `1` and the supplied data.
     pub fn from_evaluation(evaluation: Evaluation, baseline: &LoadedBaseline) -> Self {
         Self {
             schema_version: 1,
@@ -87,14 +100,35 @@ impl Report {
     }
 }
 
-/// Serializes a report as stable JSON.
+/// Serializes a report as stable, pretty-printed JSON.
+///
+/// # Errors
+///
+/// Returns [`PolicyError::Report`] if serialization fails.
+///
+/// # Parameters
+///
+/// * `report` - Report data to serialize.
+///
+/// # Returns
+///
+/// Returns pretty-printed JSON text on success.
 pub fn render_json(report: &Report) -> Result<String, PolicyError> {
     serde_json::to_string_pretty(report).map_err(|error| PolicyError::Report {
         message: error.to_string(),
     })
 }
 
-/// Serializes a report as concise Markdown.
+/// Serializes a report as concise Markdown, including the selected baseline and
+/// every policy violation.
+///
+/// # Parameters
+///
+/// * `report` - Report data to render.
+///
+/// # Returns
+///
+/// Returns the rendered Markdown document.
 pub fn render_markdown(report: &Report) -> String {
     let mut output = format!(
         "# Dependency Policy Report\n\n- Baseline: ~{}~\n- Revision: ~{}~\n\n",

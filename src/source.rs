@@ -50,6 +50,27 @@ pub struct LoadedBaseline {
 }
 
 /// Loads a baseline from a local or Git policy source pinned to its revision.
+///
+/// Local `file://` sources are read directly. Git sources are cached below
+/// `cache`, fetched when already present, and checked out at the exact commit
+/// recorded in `reference` before the baseline file is read.
+///
+/// # Errors
+///
+/// Returns [`PolicyError::Source`] for invalid or unsupported URLs, Git
+/// failures, cache failures, or a revision mismatch. Returns
+/// [`PolicyError::Baseline`] when the selected baseline cannot be read or
+/// parsed.
+///
+/// # Parameters
+///
+/// * `reference` - Validated project configuration selecting the source and
+///   revision.
+/// * `cache` - Directory used for cached Git checkouts.
+///
+/// # Returns
+///
+/// Returns the parsed baseline and the selected source commit.
 pub fn load_baseline(
     reference: &ProjectConfig,
     cache: &Utf8Path,

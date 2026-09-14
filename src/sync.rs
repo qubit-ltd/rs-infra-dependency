@@ -30,6 +30,23 @@ pub use lock_update::LockUpdate;
 pub use sync_plan::SyncPlan;
 
 /// Plans safe direct-dependency version replacements in standard dependency tables.
+///
+/// The plan covers registry-style string and inline-table declarations while
+/// leaving path and workspace dependencies unchanged. Inline declarations that
+/// cannot be safely rewritten are recorded in `SyncPlan::blocked`.
+///
+/// # Errors
+///
+/// Returns [`PolicyError::Sync`] when the manifest cannot be read or parsed.
+///
+/// # Parameters
+///
+/// * `project` - Project root containing the Cargo manifest.
+/// * `baseline` - Policy requirements used to construct edits.
+///
+/// # Returns
+///
+/// Returns safe manifest edits, compatibility lock updates, and blocked items.
 pub fn plan_sync(project: &Utf8Path, baseline: &Baseline) -> Result<SyncPlan, PolicyError> {
     let manifest_path = project.join("Cargo.toml");
     let source = std::fs::read_to_string(manifest_path.as_std_path()).map_err(|error| {
@@ -101,6 +118,23 @@ fn add_edit(plan: &mut SyncPlan, path: &Utf8Path, name: &str, old: String, new: 
 }
 
 /// Applies manifest edits from a synchronization plan.
+///
+/// Each edit is re-read and applied to the current manifest. The operation
+/// stops before writing when the plan contains blocked entries or when an edit
+/// no longer matches a supported dependency declaration.
+///
+/// # Errors
+///
+/// Returns [`PolicyError::Sync`] when the plan is blocked, a manifest cannot be
+/// read or parsed, an edit target disappeared, or a write fails.
+///
+/// # Parameters
+///
+/// * `plan` - Synchronization plan whose safe edits should be applied.
+///
+/// # Returns
+///
+/// Returns `Ok(())` after all manifest edits are written successfully.
 pub fn apply_sync(plan: &SyncPlan) -> Result<(), PolicyError> {
     if !plan.blocked.is_empty() {
         return Err(PolicyError::Sync {

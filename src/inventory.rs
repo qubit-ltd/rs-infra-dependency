@@ -108,6 +108,22 @@ pub struct Inventory {
 }
 
 /// Scan project roots without changing manifests, lockfiles, or the baseline.
+///
+/// Each root is passed to Cargo metadata, so workspace members and their
+/// resolved packages are reported together. The input paths are not required
+/// to be canonical, but each must identify a Cargo manifest.
+///
+/// # Errors
+///
+/// Returns [`PolicyError::Cargo`] when Cargo cannot load metadata for a root.
+///
+/// # Parameters
+///
+/// * `projects` - Cargo project roots to scan.
+///
+/// # Returns
+///
+/// Returns the collected inventory and conflicts across all supplied roots.
 pub fn scan_projects(projects: &[Utf8PathBuf]) -> Result<Inventory, PolicyError> {
     let mut scanned = Vec::with_capacity(projects.len());
     for project in projects {
@@ -200,7 +216,19 @@ pub fn scan_projects(projects: &[Utf8PathBuf]) -> Result<Inventory, PolicyError>
     })
 }
 
-/// Render an inventory as stable JSON.
+/// Render an inventory as stable, pretty-printed JSON.
+///
+/// # Errors
+///
+/// Returns [`PolicyError::Report`] if serialization fails.
+///
+/// # Parameters
+///
+/// * `inventory` - Inventory data to serialize.
+///
+/// # Returns
+///
+/// Returns pretty-printed JSON text on success.
 pub fn render_inventory_json(inventory: &Inventory) -> Result<String, PolicyError> {
     serde_json::to_string_pretty(inventory).map_err(|error| PolicyError::Report {
         message: error.to_string(),
@@ -208,6 +236,17 @@ pub fn render_inventory_json(inventory: &Inventory) -> Result<String, PolicyErro
 }
 
 /// Render an inventory as a concise Markdown review artifact.
+///
+/// Projects and dependency names retain the stable ordering produced by the
+/// inventory scan, making the result suitable for review and comparison.
+///
+/// # Parameters
+///
+/// * `inventory` - Inventory data to render.
+///
+/// # Returns
+///
+/// Returns the rendered Markdown document.
 pub fn render_inventory_markdown(inventory: &Inventory) -> String {
     let mut output = format!(
         "# Dependency Inventory\n\nProjects scanned: {}\n\n",

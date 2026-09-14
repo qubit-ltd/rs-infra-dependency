@@ -28,6 +28,16 @@ use crate::scan_projects;
 
 /// Runs the command-line interface for either the native binary or the
 /// compatibility Cargo subcommand.
+///
+/// This function parses `arguments`, executes the selected operation, and
+/// writes command output or diagnostics to the process streams. On an error it
+/// terminates the process with status `1` for policy violations and selected
+/// source errors, or status `2` for other command failures.
+///
+/// # Parameters
+///
+/// * `arguments` - Process arguments, including the executable name at index
+///   zero.
 pub fn run_cli(mut arguments: Vec<std::ffi::OsString>) {
     if arguments
         .get(1)
@@ -135,12 +145,31 @@ pub enum ReportFormat {
 }
 
 impl Cli {
-    /// Loads the selected project configuration for the current command.
+    /// Loads and validates the selected project configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`PolicyError`] when the configuration file cannot be read,
+    /// parsed, or validated.
+    ///
+    /// # Returns
+    ///
+    /// Returns the validated project configuration.
     pub fn load_config(&self) -> Result<ProjectConfig, PolicyError> {
         ProjectConfig::load(&self.project, self.config.as_deref())
     }
 
-    /// Executes the selected command and writes its output to stdout.
+    /// Executes the selected command and writes successful output to stdout.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`PolicyError`] when configuration, baseline loading,
+    /// evaluation, rendering, or synchronization fails. A failed policy check
+    /// is returned as [`PolicyError::PolicyViolation`].
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after the command completes successfully.
     pub fn execute(&self) -> Result<(), PolicyError> {
         if let Command::Inventory {
             roots,

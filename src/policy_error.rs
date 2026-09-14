@@ -98,6 +98,13 @@ pub enum PolicyError {
 
 impl PolicyError {
     /// Returns the stable diagnostic code for this error.
+    ///
+    /// The code is suitable for machine-readable CI handling and remains
+    /// independent of the human-readable error message.
+    ///
+    /// # Returns
+    ///
+    /// Returns the stable diagnostic code assigned to this error variant.
     #[must_use]
     #[inline]
     pub fn code(&self) -> &'static str {

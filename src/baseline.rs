@@ -31,6 +31,7 @@ pub use dependency_requirement::DependencyRequirement;
 /// ```
 #[derive(Debug, Clone)]
 pub struct Baseline {
+    /// Parsed requirements keyed by Cargo package name.
     requirements: BTreeMap<String, DependencyRequirement>,
 }
 
@@ -39,6 +40,20 @@ impl Baseline {
     ///
     /// Blank lines and lines beginning with `#` are ignored. Every other line
     /// must contain exactly one Cargo package name and one valid requirement.
+    ///
+    /// # Parameters
+    ///
+    /// * `text` - Baseline text containing one package requirement per line.
+    ///
+    /// # Returns
+    ///
+    /// Returns a baseline containing the parsed requirements on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PolicyError::InvalidBaseline`] when a line is malformed, a
+    /// package name is invalid, a requirement cannot be parsed, or a package
+    /// appears more than once.
     pub fn parse(text: &str) -> Result<Self, PolicyError> {
         let mut requirements = BTreeMap::new();
         for (index, raw_line) in text.lines().enumerate() {
@@ -81,14 +96,32 @@ impl Baseline {
         Ok(Self { requirements })
     }
 
-    /// Returns the policy requirement for one package.
+    /// Returns the policy requirement for one package, if the baseline names it.
+    ///
+    /// The returned value borrows the parsed requirement from this baseline and
+    /// remains valid for as long as the baseline is borrowed.
+    ///
+    /// # Parameters
+    ///
+    /// * `package` - Cargo package name to look up.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Some` for a package declared by the baseline, or `None` when no
+    /// matching policy entry exists.
     #[must_use]
     #[inline]
     pub fn requirement(&self, package: &str) -> Option<&DependencyRequirement> {
         self.requirements.get(package)
     }
 
-    /// Iterates package names and their requirements in stable order.
+    /// Iterates package names and their requirements in lexicographic order.
+    ///
+    /// The iterator borrows this baseline and yields each package at most once.
+    ///
+    /// # Returns
+    ///
+    /// Returns an iterator over package names and their parsed requirements.
     pub fn iter(&self) -> impl Iterator<Item = (&str, &DependencyRequirement)> {
         self.requirements
             .iter()

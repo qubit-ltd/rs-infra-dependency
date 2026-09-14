@@ -12,6 +12,7 @@ use std::env;
 
 use qubit_infra_dependency::run_cli;
 
+/// Parses compatibility-subcommand arguments and executes the policy CLI.
 fn main() {
     run_cli(env::args_os().collect());
 }
