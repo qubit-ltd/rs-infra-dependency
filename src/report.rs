@@ -32,7 +32,7 @@ pub struct BaselineIdentity {
 /// # Examples
 ///
 /// ```
-/// use qubit_dependency_policy::{BaselineIdentity, Report};
+/// use qubit_infra_dependency::{BaselineIdentity, Report};
 ///
 /// let report = Report {
 ///     schema_version: 1,

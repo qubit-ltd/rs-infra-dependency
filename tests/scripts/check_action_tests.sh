@@ -17,7 +17,7 @@ grep -Fq 'token:' "$action" || fail "missing optional token input"
 grep -Fq 'required: false' "$action" || fail "token must be optional"
 grep -Fq '/../../..' "$action" || fail "action must install from repository root"
 grep -Fq 'cargo install --path' "$action" || fail "action must install the CLI"
-grep -Fq 'cargo dependency-policy' "$action" || fail "action must run the Cargo subcommand"
+grep -Fq 'rs-infra-dependency' "$action" || fail "action must run the native command"
 grep -Fq -- '--project' "$action" || fail "action must pass the project input"
 grep -Fq 'check' "$action" || fail "action must run check"
 

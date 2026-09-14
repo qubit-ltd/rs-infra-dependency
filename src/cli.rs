@@ -28,13 +28,13 @@ use crate::scan_projects;
 
 // qubit-style: allow multiple-public-types
 
-/// Command-line arguments for cargo-dependency-policy.
+/// Command-line arguments for rs-infra-dependency.
 ///
 /// # Examples
 ///
 /// ```
 /// use camino::Utf8PathBuf;
-/// use qubit_dependency_policy::cli::{Cli, Command};
+/// use qubit_infra_dependency::cli::{Cli, Command};
 ///
 /// let cli = Cli {
 ///     project: Utf8PathBuf::from("."),
@@ -44,7 +44,7 @@ use crate::scan_projects;
 /// assert_eq!(cli.project, Utf8PathBuf::from("."));
 /// ```
 #[derive(Debug, Parser)]
-#[command(name = "cargo-dependency-policy")]
+#[command(name = "rs-infra-dependency")]
 pub struct Cli {
     /// Project root to inspect.
     #[arg(long, default_value = ".")]

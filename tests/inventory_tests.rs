@@ -7,8 +7,8 @@
 // =============================================================================
 
 use camino::Utf8PathBuf;
-use qubit_dependency_policy::render_inventory_markdown;
-use qubit_dependency_policy::scan_projects;
+use qubit_infra_dependency::render_inventory_markdown;
+use qubit_infra_dependency::scan_projects;
 
 #[test]
 fn scans_direct_requirements_and_resolved_graph() {

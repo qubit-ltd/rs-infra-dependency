@@ -1,5 +1,5 @@
 name: Rust dependency policy check
-description: Install cargo-dependency-policy from this action and check a Rust project
+description: Install rs-infra-dependency from this action and check a Rust project
 inputs:
   project:
     description: Path to the Rust project to check
@@ -24,7 +24,7 @@ runs:
       env:
         CARGO_NET_GIT_FETCH_WITH_CLI: true
       # The composite action lives below the Cargo package root.
-      run: cargo install --path "${{ github.action_path }}/../../.." --locked --force
+      run: cargo install --path "${{ github.action_path }}/../../.." --bin rs-infra-dependency --locked --force
     - name: Check dependency policy
       shell: bash
       env:
@@ -34,4 +34,4 @@ runs:
         if [[ -n "$POLICY_GIT_TOKEN" ]]; then
           git config --global url."https://x-access-token:${POLICY_GIT_TOKEN}@github.com/".insteadOf "https://github.com/"
         fi
-        cargo dependency-policy --project "${{ inputs.project }}" check
+        rs-infra-dependency --project "${{ inputs.project }}" check

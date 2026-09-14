@@ -8,9 +8,9 @@
 
 use camino::Utf8Path;
 use camino::Utf8PathBuf;
-use qubit_dependency_policy::ProjectConfig;
-use qubit_dependency_policy::evaluate;
-use qubit_dependency_policy::load_baseline;
+use qubit_infra_dependency::ProjectConfig;
+use qubit_infra_dependency::evaluate;
+use qubit_infra_dependency::load_baseline;
 
 fn config(_project: &Utf8Path) -> ProjectConfig {
     ProjectConfig {

@@ -7,8 +7,8 @@
 // =============================================================================
 
 use camino::Utf8Path;
-use qubit_dependency_policy::ProjectConfig;
-use qubit_dependency_policy::load_baseline;
+use qubit_infra_dependency::ProjectConfig;
+use qubit_infra_dependency::load_baseline;
 
 fn fixture_source(name: &str) -> String {
     let path = Utf8Path::new("tests/fixtures").join(name);
@@ -53,11 +53,11 @@ fn rejects_an_unknown_release() {
 
 #[test]
 fn rejects_duplicate_or_malformed_text_rules() {
-    let duplicate = qubit_dependency_policy::Baseline::parse("serde 1.0\nserde 1.0\n")
+    let duplicate = qubit_infra_dependency::Baseline::parse("serde 1.0\nserde 1.0\n")
         .expect_err("duplicate package must be rejected");
     assert_eq!(duplicate.code(), "DP103");
 
-    let malformed = qubit_dependency_policy::Baseline::parse("serde\n")
+    let malformed = qubit_infra_dependency::Baseline::parse("serde\n")
         .expect_err("line without a requirement must be rejected");
     assert_eq!(malformed.code(), "DP103");
 }

@@ -1,13 +1,13 @@
-# rs-dependency-policy
+# rs-infra-dependency
 
-[![Rust CI](https://github.com/qubit-ltd/rs-dependency-policy/actions/workflows/ci.yml/badge.svg)](https://github.com/qubit-ltd/rs-dependency-policy/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://qubit-ltd.github.io/rs-dependency-policy/coverage-badge.json)](https://qubit-ltd.github.io/rs-dependency-policy/coverage/)
-[![Crates.io](https://img.shields.io/crates/v/qubit-dependency-policy.svg?color=blue)](https://crates.io/crates/qubit-dependency-policy)
+[![Rust CI](https://github.com/qubit-ltd/rs-infra-dependency/actions/workflows/ci.yml/badge.svg)](https://github.com/qubit-ltd/rs-infra-dependency/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://qubit-ltd.github.io/rs-infra-dependency/coverage-badge.json)](https://qubit-ltd.github.io/rs-infra-dependency/coverage/)
+[![Crates.io](https://img.shields.io/crates/v/qubit-infra-dependency.svg?color=blue)](https://crates.io/crates/qubit-infra-dependency)
 [![Rust](https://img.shields.io/badge/rust-1.94+-blue.svg?logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
-`rs-dependency-policy` 用一份小而清晰的基线，统一组织内所有 Rust 项目的第三方**直接依赖**版本要求。它要求受治理项目在 `Cargo.toml` 中使用相同的 Cargo 版本约束，但不会替代 Cargo 的解析器，也不管理传递依赖树。
+`rs-infra-dependency` 用一份小而清晰的基线，统一组织内所有 Rust 项目的第三方**直接依赖**版本要求。它要求受治理项目在 `Cargo.toml` 中使用相同的 Cargo 版本约束，但不会替代 Cargo 的解析器，也不管理传递依赖树。
 
 例如，基线写入 `num-bigint 0.4` 后，库、私有 crate 和应用都声明
 `num-bigint = "0.4"`。Cargo 仍可按正常流程采用后续 `0.4.x` patch，任何项目却不能自行悄悄升到 `0.5`。
@@ -15,12 +15,12 @@
 ## 安装
 
 ```bash
-git clone https://github.com/qubit-ltd/rs-dependency-policy.git
-cd rs-dependency-policy
+git clone https://github.com/qubit-ltd/rs-infra-dependency.git
+cd rs-infra-dependency
 cargo install --path .
 ```
 
-安装后提供通用 Cargo 子命令 `cargo dependency-policy`。受治理仓库不需要各自安装：开发者本地安装一次即可，GitHub Actions 则使用下方的复用 Action。
+安装后提供通用 Cargo 子命令 `rs-infra-dependency`。受治理仓库不需要各自安装：开发者本地安装一次即可，GitHub Actions 则使用下方的复用 Action。
 
 ## 创建基线
 
@@ -65,9 +65,9 @@ internal-prefixes = ["acme-", "acme_"]
 检查和同步单个项目：
 
 ```bash
-cargo dependency-policy --project . check
-cargo dependency-policy --project . sync --dry-run
-cargo dependency-policy --project . sync
+rs-infra-dependency --project . check
+rs-infra-dependency --project . sync --dry-run
+rs-infra-dependency --project . sync
 ```
 
 若外部直接依赖未登记到基线，`check` 返回 `DP203`；若版本要求不同，则返回 `DP202`。`sync` 可以同步标准 `[dependencies]`、`[dev-dependencies]` 与 `[build-dependencies]`，并保留 inline table 中的 feature；它不会改动 path/workspace 依赖。
@@ -75,7 +75,7 @@ cargo dependency-policy --project . sync
 GitHub CI 中使用复用 Action：
 
 ```yaml
-- uses: qubit-ltd/rs-dependency-policy/.github/actions/check@<工具提交SHA>
+- uses: qubit-ltd/rs-infra-dependency/.github/actions/check@<工具提交SHA>
   with:
     project: .
     token: ${{ secrets.GITHUB_TOKEN }} # 仅私有策略仓库需要
@@ -97,7 +97,7 @@ cargo test
 仅需只读盘点多个项目时，运行：
 
 ```bash
-cargo dependency-policy inventory --root /work/rust-common --format markdown
+rs-infra-dependency inventory --root /work/rust-common --format markdown
 ```
 
 盘点结果是交互生成基线的依据，不是另一种策略格式。
@@ -134,4 +134,4 @@ Pull Request 前运行 `./align-ci.sh`格式化代码，运行`./ci-check.sh`对
 
 **Haixing Hu** - *Qubit Co. Ltd.*
 
-仓库地址：[https://github.com/qubit-ltd/rs-dependency-policy](https://github.com/qubit-ltd/rs-dependency-policy)
+仓库地址：[https://github.com/qubit-ltd/rs-infra-dependency](https://github.com/qubit-ltd/rs-infra-dependency)

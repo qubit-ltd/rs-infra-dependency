@@ -54,7 +54,7 @@ pub struct InventoryProject {
 /// # Examples
 ///
 /// ```
-/// use qubit_dependency_policy::Inventory;
+/// use qubit_infra_dependency::Inventory;
 ///
 /// let inventory = Inventory {
 ///     schema_version: 1,

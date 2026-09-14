@@ -1,16 +1,20 @@
 [package]
-name = "qubit-dependency-policy"
+name = "qubit-infra-dependency"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.94"
 license = "Apache-2.0"
 description = "Cross-project Rust dependency policy validation and synchronization."
-repository = "https://github.com/qubit-ltd/rs-dependency-policy"
+repository = "https://github.com/qubit-ltd/rs-infra-dependency"
 readme = "README.md"
 
 [[bin]]
-name = "cargo-dependency-policy"
+name = "rs-infra-dependency"
 path = "src/main.rs"
+
+[[bin]]
+name = "cargo-dependency-policy"
+path = "src/bin/cargo-dependency-policy.rs"
 
 [dependencies]
 camino = { version = "1.1", features = ["serde1"] }

@@ -7,8 +7,8 @@
 // =============================================================================
 
 use camino::Utf8Path;
-use qubit_dependency_policy::Baseline;
-use qubit_dependency_policy::plan_sync;
+use qubit_infra_dependency::Baseline;
+use qubit_infra_dependency::plan_sync;
 
 fn baseline() -> Baseline {
     Baseline::parse("num-bigint 0.4\n").expect("valid text baseline")

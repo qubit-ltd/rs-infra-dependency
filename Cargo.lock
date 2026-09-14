@@ -395,7 +395,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "qubit-dependency-policy"
+name = "qubit-infra-dependency"
 version = "0.1.0"
 dependencies = [
  "camino",

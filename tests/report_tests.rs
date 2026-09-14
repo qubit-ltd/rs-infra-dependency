@@ -6,11 +6,11 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_dependency_policy::BaselineIdentity;
-use qubit_dependency_policy::Report;
-use qubit_dependency_policy::Violation;
-use qubit_dependency_policy::render_json;
-use qubit_dependency_policy::render_markdown;
+use qubit_infra_dependency::BaselineIdentity;
+use qubit_infra_dependency::Report;
+use qubit_infra_dependency::Violation;
+use qubit_infra_dependency::render_json;
+use qubit_infra_dependency::render_markdown;
 
 #[test]
 fn renders_empty_json_and_markdown_reports() {

@@ -7,7 +7,7 @@
 // =============================================================================
 
 use camino::Utf8Path;
-use qubit_dependency_policy::ProjectConfig;
+use qubit_infra_dependency::ProjectConfig;
 
 #[test]
 fn rejects_policy_without_a_40_digit_revision() {
