@@ -14,19 +14,14 @@ use crate::Baseline;
 use crate::LoadedBaseline;
 use crate::PolicyError;
 use crate::ProjectConfig;
-use crate::cargo::ResolvedPackage;
 use crate::cargo::load_metadata;
 use crate::cargo::resolved_packages;
 use crate::diagnostic::Violation;
 
-/// Results of evaluating one project.
-#[derive(Debug, Clone)]
-pub struct Evaluation {
-    /// Violations found by the evaluator.
-    pub violations: Vec<Violation>,
-    /// Packages in the resolved dependency graph, included for reports only.
-    pub packages: Vec<ResolvedPackage>,
-}
+#[path = "evaluation.rs"]
+mod evaluation;
+
+pub use evaluation::Evaluation;
 
 /// Evaluates external direct dependencies against the selected baseline.
 pub fn evaluate(

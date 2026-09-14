@@ -8,8 +8,6 @@
 
 //! Public library API for loading a dependency-policy project configuration.
 
-use clap::Parser;
-
 pub mod baseline;
 pub mod cargo;
 pub mod cli;
@@ -48,22 +46,4 @@ pub use sync::SyncPlan;
 pub use sync::apply_sync;
 pub use sync::plan_sync;
 
-/// Runs the command-line interface for either the native binary or the
-/// compatibility Cargo subcommand.
-pub fn run_cli(mut arguments: Vec<std::ffi::OsString>) {
-    if arguments
-        .get(1)
-        .is_some_and(|argument| argument == "dependency-policy")
-    {
-        arguments.remove(1);
-    }
-    let cli = cli::Cli::parse_from(arguments);
-    if let Err(error) = cli.execute() {
-        eprintln!("{error}");
-        std::process::exit(if matches!(error.code(), "DP001" | "DP101") {
-            1
-        } else {
-            2
-        });
-    }
-}
+pub use cli::run_cli;

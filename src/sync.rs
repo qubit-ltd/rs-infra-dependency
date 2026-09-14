@@ -18,38 +18,16 @@ use crate::Baseline;
 use crate::PolicyError;
 use crate::Violation;
 
-/// A planned replacement in a manifest.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FileEdit {
-    /// Manifest path.
-    pub path: String,
-    /// Dependency name.
-    pub dependency: String,
-    /// Existing requirement.
-    pub old: String,
-    /// Baseline requirement.
-    pub new: String,
-}
+#[path = "file_edit.rs"]
+mod file_edit;
+#[path = "lock_update.rs"]
+mod lock_update;
+#[path = "sync_plan.rs"]
+mod sync_plan;
 
-/// A lockfile update requested after manifest synchronization.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LockUpdate {
-    /// Package name.
-    pub package: String,
-    /// Requested version requirement.
-    pub version: String,
-}
-
-/// Safe edits and changes blocked for manual review.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SyncPlan {
-    /// Mechanical manifest edits.
-    pub manifest_edits: Vec<FileEdit>,
-    /// Kept for API compatibility with callers that display requested updates.
-    pub lock_updates: Vec<LockUpdate>,
-    /// Changes that must not be automated.
-    pub blocked: Vec<Violation>,
-}
+pub use file_edit::FileEdit;
+pub use lock_update::LockUpdate;
+pub use sync_plan::SyncPlan;
 
 /// Plans safe direct-dependency version replacements in standard dependency tables.
 pub fn plan_sync(project: &Utf8Path, baseline: &Baseline) -> Result<SyncPlan, PolicyError> {
@@ -108,6 +86,7 @@ pub fn plan_sync(project: &Utf8Path, baseline: &Baseline) -> Result<SyncPlan, Po
     Ok(plan)
 }
 
+/// Adds one manifest replacement and its corresponding compatibility update.
 fn add_edit(plan: &mut SyncPlan, path: &Utf8Path, name: &str, old: String, new: &str) {
     plan.manifest_edits.push(FileEdit {
         path: path.to_string(),

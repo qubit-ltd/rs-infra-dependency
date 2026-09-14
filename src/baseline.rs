@@ -14,28 +14,21 @@ use semver::VersionReq;
 
 use crate::PolicyError;
 
-/// One declared Cargo version requirement from a baseline line.
-#[derive(Debug, Clone)]
-pub struct DependencyRequirement {
-    text: String,
-    version: VersionReq,
-}
+#[path = "dependency_requirement.rs"]
+mod dependency_requirement;
 
-impl DependencyRequirement {
-    /// Returns the original Cargo requirement text from the baseline.
-    #[must_use]
-    pub fn text(&self) -> &str {
-        &self.text
-    }
-
-    /// Returns the parsed Cargo requirement used for comparisons.
-    #[must_use]
-    pub fn version(&self) -> &VersionReq {
-        &self.version
-    }
-}
+pub use dependency_requirement::DependencyRequirement;
 
 /// A complete, organization-wide map of external direct dependencies.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_infra_dependency::Baseline;
+///
+/// let baseline = Baseline::parse("serde 1.0\n").expect("valid baseline");
+/// assert_eq!(baseline.requirement("serde").expect("serde rule").text(), "1.0");
+/// ```
 #[derive(Debug, Clone)]
 pub struct Baseline {
     requirements: BTreeMap<String, DependencyRequirement>,
@@ -43,6 +36,9 @@ pub struct Baseline {
 
 impl Baseline {
     /// Parses a baseline whose non-comment lines are `<package> <requirement>`.
+    ///
+    /// Blank lines and lines beginning with `#` are ignored. Every other line
+    /// must contain exactly one Cargo package name and one valid requirement.
     pub fn parse(text: &str) -> Result<Self, PolicyError> {
         let mut requirements = BTreeMap::new();
         for (index, raw_line) in text.lines().enumerate() {
@@ -87,6 +83,7 @@ impl Baseline {
 
     /// Returns the policy requirement for one package.
     #[must_use]
+    #[inline]
     pub fn requirement(&self, package: &str) -> Option<&DependencyRequirement> {
         self.requirements.get(package)
     }
@@ -99,12 +96,14 @@ impl Baseline {
     }
 }
 
+/// Creates the structured error for a malformed baseline line.
 fn invalid_line(line_number: usize, line: &str) -> PolicyError {
     PolicyError::InvalidBaseline {
         message: format!("line {line_number}: expected `<package> <requirement>`, found {line:?}"),
     }
 }
 
+/// Checks the restricted package-name grammar accepted by baseline files.
 fn is_package_name(name: &str) -> bool {
     !name.is_empty()
         && name
