@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
-echo "Install cargo-llvm-cov to run coverage: cargo llvm-cov --all-features"
+project_root=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+exec "$project_root/.infra/tools/infra-tool.sh" rs-infra-coverage --project "$project_root" collect "$@"

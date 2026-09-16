@@ -1,0 +1,31 @@
+format = 1
+
+[[exceptions]]
+rule = "type-file-name"
+path = "src/diagnostic.rs"
+reason = "Violation is the shared diagnostic payload for policy evaluation."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/inventory.rs"
+reason = "Inventory report types are intentionally co-located with the scanner."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/cli.rs"
+reason = "CLI command and output types form one public command contract."
+
+[[exceptions]]
+rule = "type-file-name"
+path = "src/source.rs"
+reason = "LoadedBaseline is the source loading result and stays with its loader."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/report.rs"
+reason = "Report data and rendering types are intentionally co-located."
+
+[[exceptions]]
+rule = "type-file-name"
+path = "src/cargo.rs"
+reason = "ResolvedPackage belongs to the Cargo metadata adapter."
