@@ -46,13 +46,18 @@ pub fn run_cli(mut arguments: Vec<std::ffi::OsString>) {
         arguments.remove(1);
     }
     let cli = Cli::parse_from(arguments);
-    if let Err(error) = cli.execute() {
-        eprintln!("{error}");
-        std::process::exit(if matches!(error.code(), "DP001" | "DP101") {
-            1
-        } else {
-            2
-        });
+    let command = cli.command_name();
+    match cli.execute() {
+        Ok(()) => eprintln!("rs-infra-dependency: {command} succeeded"),
+        Err(error) => {
+            eprintln!("{error}");
+            eprintln!("rs-infra-dependency: {command} failed");
+            std::process::exit(if matches!(error.code(), "DP001" | "DP101") {
+                1
+            } else {
+                2
+            });
+        }
     }
 }
 
@@ -145,6 +150,16 @@ pub enum ReportFormat {
 }
 
 impl Cli {
+    /// Returns the stable command name used in completion diagnostics.
+    fn command_name(&self) -> &'static str {
+        match &self.command {
+            Command::Inventory { .. } => "inventory",
+            Command::Check => "check",
+            Command::Report { .. } => "report",
+            Command::Sync { .. } => "sync",
+        }
+    }
+
     /// Loads and validates the selected project configuration.
     ///
     /// # Errors
