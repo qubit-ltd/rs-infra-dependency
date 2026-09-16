@@ -65,18 +65,13 @@ impl ProjectConfig {
     /// # Returns
     ///
     /// Returns the validated project configuration.
-    pub fn load(
-        project_root: &Utf8Path,
-        override_path: Option<&Utf8Path>,
-    ) -> Result<Self, PolicyError> {
+    pub fn load(project_root: &Utf8Path, override_path: Option<&Utf8Path>) -> Result<Self, PolicyError> {
         let path = override_path
             .map(Utf8Path::to_owned)
             .unwrap_or_else(|| project_root.join(".infra/dep/policy.toml"));
-        let text = std::fs::read_to_string(path.as_std_path()).map_err(|source| {
-            PolicyError::ReadConfig {
-                path: path.to_string(),
-                source,
-            }
+        let text = std::fs::read_to_string(path.as_std_path()).map_err(|source| PolicyError::ReadConfig {
+            path: path.to_string(),
+            source,
         })?;
         let config: Self = toml::from_str(&text).map_err(|source| PolicyError::ParseConfig {
             path: path.to_string(),
@@ -122,8 +117,7 @@ impl ProjectConfig {
                 message: "baseline must be a simple release name".into(),
             });
         }
-        if self.revision.len() != 40 || !self.revision.bytes().all(|byte| byte.is_ascii_hexdigit())
-        {
+        if self.revision.len() != 40 || !self.revision.bytes().all(|byte| byte.is_ascii_hexdigit()) {
             return Err(PolicyError::InvalidConfig {
                 code: "DP001",
                 message: "revision must be a 40-digit hexadecimal commit SHA".into(),

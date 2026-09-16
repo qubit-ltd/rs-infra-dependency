@@ -135,37 +135,31 @@ pub fn scan_projects(projects: &[Utf8PathBuf]) -> Result<Inventory, PolicyError>
             message: format!("{}: {}", project, error),
         })?;
         let members = metadata.workspace_packages();
-        let packages = members
-            .iter()
-            .map(|p| p.name.to_string())
-            .collect::<Vec<_>>();
+        let packages = members.iter().map(|p| p.name.to_string()).collect::<Vec<_>>();
         let dependencies = members
             .iter()
             .flat_map(|package| {
-                package
-                    .dependencies
-                    .iter()
-                    .map(move |dependency| InventoryDependency {
-                        package: package.name.to_string(),
-                        name: dependency.name.to_string(),
-                        requirement: Some(dependency.req.to_string()),
-                        source: if dependency.path.is_some() {
-                            "path"
-                        } else if dependency.source.is_some() {
-                            "registry-or-git"
-                        } else {
-                            "workspace"
-                        }
-                        .into(),
-                        kind: match dependency.kind {
-                            DependencyKind::Normal => "normal",
-                            DependencyKind::Build => "build",
-                            DependencyKind::Development => "dev",
-                            _ => "other",
-                        }
-                        .into(),
-                        optional: dependency.optional,
-                    })
+                package.dependencies.iter().map(move |dependency| InventoryDependency {
+                    package: package.name.to_string(),
+                    name: dependency.name.to_string(),
+                    requirement: Some(dependency.req.to_string()),
+                    source: if dependency.path.is_some() {
+                        "path"
+                    } else if dependency.source.is_some() {
+                        "registry-or-git"
+                    } else {
+                        "workspace"
+                    }
+                    .into(),
+                    kind: match dependency.kind {
+                        DependencyKind::Normal => "normal",
+                        DependencyKind::Build => "build",
+                        DependencyKind::Development => "dev",
+                        _ => "other",
+                    }
+                    .into(),
+                    optional: dependency.optional,
+                })
             })
             .collect();
         let resolved = metadata
@@ -196,10 +190,7 @@ pub fn scan_projects(projects: &[Utf8PathBuf]) -> Result<Inventory, PolicyError>
                     .or_default()
                     .contains(requirement)
             {
-                observed
-                    .get_mut(&dependency.name)
-                    .unwrap()
-                    .push(requirement.clone());
+                observed.get_mut(&dependency.name).unwrap().push(requirement.clone());
             }
         }
     }

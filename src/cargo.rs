@@ -42,10 +42,9 @@ pub struct ResolvedPackage {
     pub source: Option<String>,
 }
 
-/// Loads root-package Cargo metadata without resolving or updating dependencies.
-pub(crate) fn load_metadata(
-    project: &Utf8Path,
-) -> Result<(Metadata, Option<Package>), PolicyError> {
+/// Loads root-package Cargo metadata without resolving or updating
+/// dependencies.
+pub(crate) fn load_metadata(project: &Utf8Path) -> Result<(Metadata, Option<Package>), PolicyError> {
     let manifest = project.join("Cargo.toml");
     let mut command = MetadataCommand::new();
     command.manifest_path(manifest.as_std_path());

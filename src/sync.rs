@@ -29,7 +29,8 @@ pub use file_edit::FileEdit;
 pub use lock_update::LockUpdate;
 pub use sync_plan::SyncPlan;
 
-/// Plans safe direct-dependency version replacements in standard dependency tables.
+/// Plans safe direct-dependency version replacements in standard dependency
+/// tables.
 ///
 /// The plan covers registry-style string and inline-table declarations while
 /// leaving path and workspace dependencies unchanged. Inline declarations that
@@ -49,16 +50,12 @@ pub use sync_plan::SyncPlan;
 /// Returns safe manifest edits, compatibility lock updates, and blocked items.
 pub fn plan_sync(project: &Utf8Path, baseline: &Baseline) -> Result<SyncPlan, PolicyError> {
     let manifest_path = project.join("Cargo.toml");
-    let source = std::fs::read_to_string(manifest_path.as_std_path()).map_err(|error| {
-        PolicyError::Sync {
-            message: format!("failed to read {manifest_path}: {error}"),
-        }
+    let source = std::fs::read_to_string(manifest_path.as_std_path()).map_err(|error| PolicyError::Sync {
+        message: format!("failed to read {manifest_path}: {error}"),
     })?;
-    let document = source
-        .parse::<DocumentMut>()
-        .map_err(|error| PolicyError::Sync {
-            message: format!("failed to parse {manifest_path}: {error}"),
-        })?;
+    let document = source.parse::<DocumentMut>().map_err(|error| PolicyError::Sync {
+        message: format!("failed to parse {manifest_path}: {error}"),
+    })?;
     let mut plan = SyncPlan {
         manifest_edits: Vec::new(),
         lock_updates: Vec::new(),
@@ -82,13 +79,9 @@ pub fn plan_sync(project: &Utf8Path, baseline: &Baseline) -> Result<SyncPlan, Po
                     continue;
                 }
                 match inline.get("version").and_then(Value::as_str) {
-                    Some(old) if old != requirement.text() => add_edit(
-                        &mut plan,
-                        &manifest_path,
-                        name,
-                        old.into(),
-                        requirement.text(),
-                    ),
+                    Some(old) if old != requirement.text() => {
+                        add_edit(&mut plan, &manifest_path, name, old.into(), requirement.text())
+                    }
                     Some(_) => {}
                     None => plan.blocked.push(Violation {
                         code: "DP301",
@@ -143,15 +136,12 @@ pub fn apply_sync(plan: &SyncPlan) -> Result<(), PolicyError> {
     }
     for edit in &plan.manifest_edits {
         let path = Utf8Path::new(&edit.path);
-        let source =
-            std::fs::read_to_string(path.as_std_path()).map_err(|error| PolicyError::Sync {
-                message: format!("failed to read {}: {error}", edit.path),
-            })?;
-        let mut document = source
-            .parse::<DocumentMut>()
-            .map_err(|error| PolicyError::Sync {
-                message: format!("failed to parse {}: {error}", edit.path),
-            })?;
+        let source = std::fs::read_to_string(path.as_std_path()).map_err(|error| PolicyError::Sync {
+            message: format!("failed to read {}: {error}", edit.path),
+        })?;
+        let mut document = source.parse::<DocumentMut>().map_err(|error| PolicyError::Sync {
+            message: format!("failed to parse {}: {error}", edit.path),
+        })?;
         let mut updated = false;
         for table_name in ["dependencies", "dev-dependencies", "build-dependencies"] {
             let Some(item) = document
@@ -176,10 +166,8 @@ pub fn apply_sync(plan: &SyncPlan) -> Result<(), PolicyError> {
                 message: format!("dependency {} disappeared", edit.dependency),
             });
         }
-        std::fs::write(path.as_std_path(), document.to_string()).map_err(|error| {
-            PolicyError::Sync {
-                message: format!("failed to write {}: {error}", edit.path),
-            }
+        std::fs::write(path.as_std_path(), document.to_string()).map_err(|error| PolicyError::Sync {
+            message: format!("failed to write {}: {error}", edit.path),
         })?;
     }
     Ok(())

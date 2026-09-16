@@ -71,10 +71,7 @@ pub struct LoadedBaseline {
 /// # Returns
 ///
 /// Returns the parsed baseline and the selected source commit.
-pub fn load_baseline(
-    reference: &ProjectConfig,
-    cache: &Utf8Path,
-) -> Result<LoadedBaseline, PolicyError> {
+pub fn load_baseline(reference: &ProjectConfig, cache: &Utf8Path) -> Result<LoadedBaseline, PolicyError> {
     let source = Url::parse(&reference.source).map_err(|error| PolicyError::Source {
         message: format!("invalid policy source URL: {error}"),
     })?;
@@ -103,15 +100,9 @@ fn file_source_root(source: &Url) -> Result<Utf8PathBuf, PolicyError> {
 }
 
 /// Clones or refreshes a Git source and checks out its requested revision.
-fn load_git_source(
-    reference: &ProjectConfig,
-    cache: &Utf8Path,
-) -> Result<Utf8PathBuf, PolicyError> {
+fn load_git_source(reference: &ProjectConfig, cache: &Utf8Path) -> Result<Utf8PathBuf, PolicyError> {
     let cache = absolute_path(cache)?;
-    let source = reference
-        .source
-        .strip_prefix("git+")
-        .unwrap_or(&reference.source);
+    let source = reference.source.strip_prefix("git+").unwrap_or(&reference.source);
     let root = cache.join(git_cache_name(source));
     if root.exists() {
         run_git(&root, &["fetch", "--force", "--tags", "origin"])?;
@@ -121,10 +112,7 @@ fn load_git_source(
         })?;
         run_git_in(&cache, &["clone", "--no-checkout", source, root.as_str()])?;
     }
-    run_git(
-        &root,
-        &["checkout", "--detach", "--force", &reference.revision],
-    )?;
+    run_git(&root, &["checkout", "--detach", "--force", &reference.revision])?;
     let head = run_git(&root, &["rev-parse", "HEAD"])?;
     if !head.eq_ignore_ascii_case(&reference.revision) {
         return Err(PolicyError::Source {
@@ -164,7 +152,8 @@ fn run_git(repository: &Utf8Path, arguments: &[&str]) -> Result<String, PolicyEr
     run_git_in(repository, arguments)
 }
 
-/// Runs Git in a directory and maps process or output failures to policy errors.
+/// Runs Git in a directory and maps process or output failures to policy
+/// errors.
 fn run_git_in(directory: &Utf8Path, arguments: &[&str]) -> Result<String, PolicyError> {
     let output = Command::new("git")
         .args(arguments)
@@ -185,25 +174,17 @@ fn run_git_in(directory: &Utf8Path, arguments: &[&str]) -> Result<String, Policy
     String::from_utf8(output.stdout)
         .map(|output| output.trim().to_owned())
         .map_err(|error| PolicyError::Source {
-            message: format!(
-                "git {} returned non-UTF-8 output: {error}",
-                arguments.join(" ")
-            ),
+            message: format!("git {} returned non-UTF-8 output: {error}", arguments.join(" ")),
         })
 }
 
 /// Reads and validates the selected baseline file from a source root.
-fn load_baseline_from_root(
-    reference: &ProjectConfig,
-    root: Utf8PathBuf,
-) -> Result<LoadedBaseline, PolicyError> {
+fn load_baseline_from_root(reference: &ProjectConfig, root: Utf8PathBuf) -> Result<LoadedBaseline, PolicyError> {
     let baseline_path = root
         .join("policy/baselines")
         .join(format!("{}.txt", reference.baseline));
-    let text = std::fs::read_to_string(baseline_path.as_std_path()).map_err(|error| {
-        PolicyError::Baseline {
-            message: format!("failed to read {}: {error}", baseline_path),
-        }
+    let text = std::fs::read_to_string(baseline_path.as_std_path()).map_err(|error| PolicyError::Baseline {
+        message: format!("failed to read {}: {error}", baseline_path),
     })?;
     let baseline = Baseline::parse(&text)?;
     Ok(LoadedBaseline {

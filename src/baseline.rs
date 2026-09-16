@@ -63,21 +63,14 @@ impl Baseline {
                 continue;
             }
             let mut fields = line.split_whitespace();
-            let name = fields
-                .next()
-                .ok_or_else(|| invalid_line(line_number, line))?;
-            let requirement = fields
-                .next()
-                .ok_or_else(|| invalid_line(line_number, line))?;
+            let name = fields.next().ok_or_else(|| invalid_line(line_number, line))?;
+            let requirement = fields.next().ok_or_else(|| invalid_line(line_number, line))?;
             if fields.next().is_some() || !is_package_name(name) {
                 return Err(invalid_line(line_number, line));
             }
-            let version =
-                VersionReq::parse(requirement).map_err(|error| PolicyError::InvalidBaseline {
-                    message: format!(
-                        "line {line_number}: invalid Cargo requirement {requirement:?}: {error}"
-                    ),
-                })?;
+            let version = VersionReq::parse(requirement).map_err(|error| PolicyError::InvalidBaseline {
+                message: format!("line {line_number}: invalid Cargo requirement {requirement:?}: {error}"),
+            })?;
             if requirements
                 .insert(
                     name.into(),
@@ -96,7 +89,8 @@ impl Baseline {
         Ok(Self { requirements })
     }
 
-    /// Returns the policy requirement for one package, if the baseline names it.
+    /// Returns the policy requirement for one package, if the baseline names
+    /// it.
     ///
     /// The returned value borrows the parsed requirement from this baseline and
     /// remains valid for as long as the baseline is borrowed.

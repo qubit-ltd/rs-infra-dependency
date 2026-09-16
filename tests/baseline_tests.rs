@@ -25,8 +25,7 @@ fn loads_a_text_baseline_with_patch_compatible_requirements() {
         baseline: "v2026.09.0".into(),
         internal_prefixes: Vec::new(),
     };
-    let baseline = load_baseline(&reference, Utf8Path::new("target/t2/cache"))
-        .expect("fixture baseline should load");
+    let baseline = load_baseline(&reference, Utf8Path::new("target/t2/cache")).expect("fixture baseline should load");
     assert_eq!(baseline.release, "v2026.09.0");
     assert_eq!(
         baseline
@@ -47,18 +46,15 @@ fn rejects_an_unknown_release() {
         baseline: "v2099.01.0".into(),
         internal_prefixes: Vec::new(),
     };
-    let error = load_baseline(&reference, Utf8Path::new("target/t2/cache"))
-        .expect_err("unknown release should fail");
+    let error = load_baseline(&reference, Utf8Path::new("target/t2/cache")).expect_err("unknown release should fail");
     assert_eq!(error.code(), "DP102");
 }
 
 #[test]
 fn rejects_duplicate_or_malformed_text_rules() {
-    let duplicate =
-        Baseline::parse("serde 1.0\nserde 1.0\n").expect_err("duplicate package must be rejected");
+    let duplicate = Baseline::parse("serde 1.0\nserde 1.0\n").expect_err("duplicate package must be rejected");
     assert_eq!(duplicate.code(), "DP103");
 
-    let malformed =
-        Baseline::parse("serde\n").expect_err("line without a requirement must be rejected");
+    let malformed = Baseline::parse("serde\n").expect_err("line without a requirement must be rejected");
     assert_eq!(malformed.code(), "DP103");
 }

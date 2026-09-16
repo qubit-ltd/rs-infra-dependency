@@ -36,7 +36,8 @@ pub use evaluation::Evaluation;
 /// # Parameters
 ///
 /// * `project` - Cargo project root whose direct dependencies are evaluated.
-/// * `config` - Configuration controlling first-party dependency classification.
+/// * `config` - Configuration controlling first-party dependency
+///   classification.
 /// * `baseline` - Loaded policy baseline used for requirement comparisons.
 ///
 /// # Returns

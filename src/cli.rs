@@ -39,10 +39,7 @@ use crate::scan_projects;
 /// * `arguments` - Process arguments, including the executable name at index
 ///   zero.
 pub fn run_cli(mut arguments: Vec<std::ffi::OsString>) {
-    if arguments
-        .get(1)
-        .is_some_and(|argument| argument == "dependency-policy")
-    {
+    if arguments.get(1).is_some_and(|argument| argument == "dependency-policy") {
         arguments.remove(1);
     }
     let cli = Cli::parse_from(arguments);
@@ -186,23 +183,16 @@ impl Cli {
     ///
     /// Returns `Ok(())` after the command completes successfully.
     pub fn execute(&self) -> Result<(), PolicyError> {
-        if let Command::Inventory {
-            roots,
-            format,
-            output,
-        } = &self.command
-        {
+        if let Command::Inventory { roots, format, output } = &self.command {
             let inventory = scan_projects(roots)?;
             let text = match format {
                 ReportFormat::Json => render_inventory_json(&inventory)?,
                 ReportFormat::Markdown => render_inventory_markdown(&inventory),
             };
             if let Some(path) = output {
-                std::fs::write(path.as_std_path(), format!("{text}\n")).map_err(|source| {
-                    PolicyError::ReadConfig {
-                        path: path.to_string(),
-                        source,
-                    }
+                std::fs::write(path.as_std_path(), format!("{text}\n")).map_err(|source| PolicyError::ReadConfig {
+                    path: path.to_string(),
+                    source,
                 })?;
             } else {
                 println!("{text}");

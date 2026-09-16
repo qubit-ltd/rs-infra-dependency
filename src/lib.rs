@@ -26,6 +26,7 @@ pub mod sync;
 pub use baseline::Baseline;
 pub use baseline::DependencyRequirement;
 pub use cargo::ResolvedPackage;
+pub use cli::run_cli;
 pub use config::ProjectConfig;
 pub use diagnostic::Violation;
 pub use inventory::Inventory;
@@ -48,5 +49,3 @@ pub use sync::LockUpdate;
 pub use sync::SyncPlan;
 pub use sync::apply_sync;
 pub use sync::plan_sync;
-
-pub use cli::run_cli;

@@ -42,19 +42,13 @@ fn create_remote() -> (TempDir, Utf8PathBuf, String) {
     let root = Utf8PathBuf::from_path_buf(temporary.path().to_owned()).expect("UTF-8 temp path");
     let remote = root.join("remote.git");
     let worktree = root.join("worktree");
-    std::fs::create_dir_all(worktree.join("policy/baselines").as_std_path())
-        .expect("baseline directory");
+    std::fs::create_dir_all(worktree.join("policy/baselines").as_std_path()).expect("baseline directory");
     run_git(&root, &["init", "--bare", remote.as_str()]);
     run_git(&root, &["init", "-b", "main", worktree.as_str()]);
     run_git(&worktree, &["config", "user.email", "test@example.invalid"]);
-    run_git(
-        &worktree,
-        &["config", "user.name", "Dependency Policy Test"],
-    );
+    run_git(&worktree, &["config", "user.name", "Dependency Policy Test"]);
     std::fs::write(
-        worktree
-            .join("policy/baselines/v2026.09.0.txt")
-            .as_std_path(),
+        worktree.join("policy/baselines/v2026.09.0.txt").as_std_path(),
         baseline("^0.4"),
     )
     .expect("first baseline");
@@ -65,9 +59,7 @@ fn create_remote() -> (TempDir, Utf8PathBuf, String) {
     run_git(&worktree, &["push", "origin", "main"]);
 
     std::fs::write(
-        worktree
-            .join("policy/baselines/v2026.09.0.txt")
-            .as_std_path(),
+        worktree.join("policy/baselines/v2026.09.0.txt").as_std_path(),
         baseline("^0.5"),
     )
     .expect("second baseline");

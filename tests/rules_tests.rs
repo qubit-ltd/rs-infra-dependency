@@ -33,12 +33,7 @@ fn reports_a_direct_num_bigint_version_drift() {
     let config = config(&project);
     let baseline = load_baseline(&config, Utf8Path::new("target/t3/cache")).expect("baseline");
     let evaluation = evaluate(&project, &config, &baseline).expect("evaluation");
-    assert!(
-        evaluation
-            .violations
-            .iter()
-            .any(|item| item.code == "DP202")
-    );
+    assert!(evaluation.violations.iter().any(|item| item.code == "DP202"));
 }
 
 #[test]
@@ -47,12 +42,7 @@ fn accepts_an_application_without_a_lockfile() {
     let config = config(&project);
     let baseline = load_baseline(&config, Utf8Path::new("target/t3/cache")).expect("baseline");
     let evaluation = evaluate(&project, &config, &baseline).expect("evaluation");
-    assert!(
-        !evaluation
-            .violations
-            .iter()
-            .any(|item| item.code == "DP201")
-    );
+    assert!(!evaluation.violations.iter().any(|item| item.code == "DP201"));
 }
 
 #[test]
@@ -71,10 +61,5 @@ fn reports_an_external_direct_dependency_missing_from_the_baseline() {
 
     let evaluation = evaluate(&project, &config, &baseline).expect("evaluation");
 
-    assert!(
-        evaluation
-            .violations
-            .iter()
-            .any(|item| item.code == "DP203")
-    );
+    assert!(evaluation.violations.iter().any(|item| item.code == "DP203"));
 }

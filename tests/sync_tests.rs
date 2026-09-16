@@ -16,11 +16,7 @@ fn baseline() -> Baseline {
 
 #[test]
 fn plans_num_bigint_version_replacement_without_writing() {
-    let plan = plan_sync(
-        Utf8Path::new("tests/fixtures/sync-version-only"),
-        &baseline(),
-    )
-    .expect("sync plan");
+    let plan = plan_sync(Utf8Path::new("tests/fixtures/sync-version-only"), &baseline()).expect("sync plan");
     assert_eq!(plan.manifest_edits.len(), 1);
     assert_eq!(plan.manifest_edits[0].dependency, "num-bigint");
     assert_eq!(plan.manifest_edits[0].new, "0.4");
@@ -28,10 +24,6 @@ fn plans_num_bigint_version_replacement_without_writing() {
 
 #[test]
 fn blocks_inline_dependency_declarations() {
-    let plan = plan_sync(
-        Utf8Path::new("tests/fixtures/sync-feature-conflict"),
-        &baseline(),
-    )
-    .expect("sync plan");
+    let plan = plan_sync(Utf8Path::new("tests/fixtures/sync-feature-conflict"), &baseline()).expect("sync plan");
     assert_eq!(plan.manifest_edits[0].new, "0.4");
 }
