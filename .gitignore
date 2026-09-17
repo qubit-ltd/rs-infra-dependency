@@ -1,2 +1,3 @@
 /target/
 /.infra/tools/bin/
+/.worktrees/
