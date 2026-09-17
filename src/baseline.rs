@@ -6,7 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Plain-text third-party dependency baseline parsing.
+//! Direct and resolved third-party dependency baseline parsing.
 
 use std::collections::BTreeMap;
 
@@ -33,6 +33,8 @@ pub use dependency_requirement::DependencyRequirement;
 pub struct Baseline {
     /// Parsed requirements keyed by Cargo package name.
     requirements: BTreeMap<String, DependencyRequirement>,
+    /// Minimum versions for packages in the resolved dependency graph.
+    resolved_requirements: BTreeMap<String, DependencyRequirement>,
 }
 
 impl Baseline {
@@ -86,7 +88,38 @@ impl Baseline {
                 });
             }
         }
-        Ok(Self { requirements })
+        Ok(Self {
+            requirements,
+            resolved_requirements: BTreeMap::new(),
+        })
+    }
+
+    /// Parses a TOML baseline containing `direct` and `resolved` tables.
+    pub fn parse_toml(text: &str) -> Result<Self, PolicyError> {
+        #[derive(serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Document {
+            format: u32,
+            #[serde(default)]
+            direct: BTreeMap<String, String>,
+            #[serde(default)]
+            resolved: BTreeMap<String, String>,
+        }
+
+        let document: Document = toml::from_str(text).map_err(|error| PolicyError::InvalidBaseline {
+            message: format!("invalid TOML baseline: {error}"),
+        })?;
+        if document.format != 3 {
+            return Err(PolicyError::InvalidBaseline {
+                message: format!("unsupported TOML baseline format {}", document.format),
+            });
+        }
+        let requirements = parse_rules(document.direct, false)?;
+        let resolved_requirements = parse_rules(document.resolved, true)?;
+        Ok(Self {
+            requirements,
+            resolved_requirements,
+        })
     }
 
     /// Returns the policy requirement for one package, if the baseline names
@@ -121,6 +154,61 @@ impl Baseline {
             .iter()
             .map(|(name, requirement)| (name.as_str(), requirement))
     }
+
+    /// Iterates minimum-version rules for resolved packages.
+    pub fn resolved_iter(&self) -> impl Iterator<Item = (&str, &DependencyRequirement)> {
+        self.resolved_requirements
+            .iter()
+            .map(|(name, requirement)| (name.as_str(), requirement))
+    }
+
+    /// Returns whether this baseline contains resolved-package rules.
+    #[must_use]
+    pub fn has_resolved_rules(&self) -> bool {
+        !self.resolved_requirements.is_empty()
+    }
+}
+
+fn parse_rules(
+    rules: BTreeMap<String, String>,
+    resolved: bool,
+) -> Result<BTreeMap<String, DependencyRequirement>, PolicyError> {
+    let mut parsed = BTreeMap::new();
+    for (name, text) in rules {
+        if !is_package_name(&name) {
+            return Err(PolicyError::InvalidBaseline {
+                message: format!("invalid package name {name:?}"),
+            });
+        }
+        if resolved && !text.starts_with(">=") {
+            return Err(PolicyError::InvalidBaseline {
+                message: format!("resolved rule for {name:?} must use >=MAJOR.MINOR.PATCH"),
+            });
+        }
+        let version = VersionReq::parse(&text).map_err(|error| PolicyError::InvalidBaseline {
+            message: format!("invalid requirement {text:?} for {name:?}: {error}"),
+        })?;
+        if resolved {
+            let version_text = text.trim_start_matches(">=").trim();
+            let parsed_version =
+                semver::Version::parse(version_text).map_err(|error| PolicyError::InvalidBaseline {
+                    message: format!("resolved rule for {name:?} must use a complete version: {error}"),
+                })?;
+            if parsed_version.pre.is_empty()
+                && parsed_version.build.is_empty()
+                && text.trim() == format!(">={parsed_version}")
+            {
+                // The normalized form is intentionally limited to a stable
+                // lower bound.
+            } else {
+                return Err(PolicyError::InvalidBaseline {
+                    message: format!("resolved rule for {name:?} must use >=MAJOR.MINOR.PATCH"),
+                });
+            }
+        }
+        parsed.insert(name, DependencyRequirement { text, version });
+    }
+    Ok(parsed)
 }
 
 /// Creates the structured error for a malformed baseline line.

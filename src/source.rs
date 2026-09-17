@@ -180,13 +180,31 @@ fn run_git_in(directory: &Utf8Path, arguments: &[&str]) -> Result<String, Policy
 
 /// Reads and validates the selected baseline file from a source root.
 fn load_baseline_from_root(reference: &ProjectConfig, root: Utf8PathBuf) -> Result<LoadedBaseline, PolicyError> {
-    let baseline_path = root
-        .join("policy/baselines")
-        .join(format!("{}.txt", reference.baseline));
+    let directory = root.join("policy/baselines");
+    let toml_path = directory.join(format!("{}.toml", reference.baseline));
+    let text_path = directory.join(format!("{}.txt", reference.baseline));
+    let baseline_path = match (toml_path.exists(), text_path.exists()) {
+        (true, true) => {
+            return Err(PolicyError::Baseline {
+                message: format!("both {toml_path} and {text_path} exist"),
+            });
+        }
+        (true, false) => toml_path,
+        (false, true) => text_path,
+        (false, false) => {
+            return Err(PolicyError::Baseline {
+                message: format!("baseline file is missing: {toml_path} or {text_path}"),
+            });
+        }
+    };
     let text = std::fs::read_to_string(baseline_path.as_std_path()).map_err(|error| PolicyError::Baseline {
         message: format!("failed to read {}: {error}", baseline_path),
     })?;
-    let baseline = Baseline::parse(&text)?;
+    let baseline = if baseline_path.extension() == Some("toml") {
+        Baseline::parse_toml(&text)?
+    } else {
+        Baseline::parse(&text)?
+    };
     Ok(LoadedBaseline {
         commit: reference.revision.clone(),
         release: reference.baseline.clone(),

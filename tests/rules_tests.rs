@@ -63,3 +63,13 @@ fn reports_an_external_direct_dependency_missing_from_the_baseline() {
 
     assert!(evaluation.violations.iter().any(|item| item.code == "DP203"));
 }
+
+#[test]
+fn reports_a_resolved_package_below_its_minimum() {
+    let project = Utf8PathBuf::from("tests/fixtures/num-bigint-04");
+    let mut config = config(&project);
+    config.baseline = "v2026.09.1".into();
+    let baseline = load_baseline(&config, Utf8Path::new("target/t3/cache")).expect("baseline");
+    let evaluation = evaluate(&project, &config, &baseline).expect("evaluation");
+    assert!(evaluation.violations.iter().any(|item| item.code == "DP401"));
+}

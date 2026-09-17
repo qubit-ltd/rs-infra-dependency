@@ -8,7 +8,10 @@
 
 //! Cargo metadata loading and resolved-package projection.
 
+use std::process::Command;
+
 use camino::Utf8Path;
+use camino::Utf8PathBuf;
 use cargo_metadata::Metadata;
 use cargo_metadata::MetadataCommand;
 use cargo_metadata::Package;
@@ -55,6 +58,55 @@ pub(crate) fn load_metadata(project: &Utf8Path) -> Result<(Metadata, Option<Pack
     })?;
     let root = metadata.root_package().cloned();
     Ok((metadata, root))
+}
+
+/// Returns the Cargo workspace root without resolving dependencies.
+pub(crate) fn workspace_root(project: &Utf8Path) -> Result<Utf8PathBuf, PolicyError> {
+    let manifest = project.join("Cargo.toml");
+    let output = Command::new("cargo")
+        .args([
+            "locate-project",
+            "--workspace",
+            "--message-format",
+            "plain",
+            "--manifest-path",
+            manifest.as_str(),
+        ])
+        .output()
+        .map_err(|error| PolicyError::Cargo {
+            code: "DP201",
+            message: format!("failed to locate Cargo workspace: {error}"),
+        })?;
+    if !output.status.success() {
+        return Err(PolicyError::Cargo {
+            code: "DP201",
+            message: String::from_utf8_lossy(&output.stderr).trim().into(),
+        });
+    }
+    let manifest = String::from_utf8(output.stdout).map_err(|error| PolicyError::Cargo {
+        code: "DP201",
+        message: format!("Cargo workspace path is not UTF-8: {error}"),
+    })?;
+    let manifest = Utf8PathBuf::from(manifest.trim());
+    manifest
+        .parent()
+        .map(Utf8Path::to_owned)
+        .ok_or_else(|| PolicyError::Cargo {
+            code: "DP201",
+            message: "Cargo workspace manifest has no parent".into(),
+        })
+}
+
+/// Loads the complete resolved graph while refusing to change Cargo.lock.
+pub(crate) fn load_locked_metadata(project: &Utf8Path) -> Result<Metadata, PolicyError> {
+    let manifest = project.join("Cargo.toml");
+    let mut command = MetadataCommand::new();
+    command.manifest_path(manifest.as_std_path());
+    command.other_options(vec!["--locked".into(), "--all-features".into()]);
+    command.exec().map_err(|error| PolicyError::Cargo {
+        code: "DP404",
+        message: format!("locked Cargo metadata failed: {error}"),
+    })
 }
 
 /// Converts Cargo metadata packages into stable report records.

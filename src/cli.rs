@@ -25,6 +25,7 @@ use crate::render_inventory_markdown;
 use crate::render_json;
 use crate::render_markdown;
 use crate::scan_projects;
+use crate::temporary_lockfile::TemporaryLockfile;
 
 /// Runs the command-line interface for either the native binary or the
 /// compatibility Cargo subcommand.
@@ -71,6 +72,7 @@ pub fn run_cli(mut arguments: Vec<std::ffi::OsString>) {
 /// let cli = Cli {
 ///     project: Utf8PathBuf::from("."),
 ///     config: None,
+///     temporary_lockfile: false,
 ///     command: Command::Check,
 /// };
 /// assert_eq!(cli.project, Utf8PathBuf::from("."));
@@ -84,6 +86,9 @@ pub struct Cli {
     /// Explicit project configuration path.
     #[arg(long)]
     pub config: Option<Utf8PathBuf>,
+    /// Generate and remove a lock file when resolved rules need one.
+    #[arg(long, global = true)]
+    pub temporary_lockfile: bool,
     /// Policy operation.
     #[command(subcommand)]
     pub command: Command,
@@ -201,7 +206,10 @@ impl Cli {
         }
         let config = self.load_config()?;
         let baseline = load_baseline(&config, &self.project.join("target/policy-cache"))?;
-        match &self.command {
+        let needs_lock =
+            baseline.baseline.has_resolved_rules() && matches!(self.command, Command::Check | Command::Report { .. });
+        let temporary_lockfile = TemporaryLockfile::prepare(&self.project, needs_lock, self.temporary_lockfile)?;
+        let result = match &self.command {
             Command::Inventory { .. } => unreachable!("inventory handled before baseline loading"),
             Command::Check => {
                 let evaluation = evaluate(&self.project, &config, &baseline)?;
@@ -230,6 +238,12 @@ impl Cli {
                 }
                 if *dry_run { Ok(()) } else { apply_sync(&plan) }
             }
+        };
+        if let Some(lockfile) = temporary_lockfile
+            && result.is_ok()
+        {
+            lockfile.cleanup()?;
         }
+        result
     }
 }

@@ -14,7 +14,7 @@ usage() {
 
 选项：
   --release <版本>   baseline release，默认当前日期 vYYYY.MM.DD
-  --output <文件>    输出 baseline 文本文件
+  --output <文件>    输出 baseline 文件（.toml 生成 format=3）
   --internal-prefix <前缀>  声明内部 crate 命名空间前缀（可重复；默认不排除任何 registry crate）
   --help             显示帮助
 
@@ -98,12 +98,22 @@ while IFS= read -r name; do
         printf '%s\t%s\n' "$name" "$selected" >>"$rules"
 done < <(jq -r '.direct_requirements | keys[]' "$inventory")
 
-{
-    printf '# package requirement\n'
-    while IFS=$'\t' read -r name selected; do
-        printf '%s %s\n' "$name" "$selected"
-    done <"$rules"
-} >"$output"
+if [[ "$output" == *.toml ]]; then
+    {
+        printf 'format = 3\n\n[direct]\n'
+        while IFS=$'\t' read -r name selected; do
+            printf '%s = "%s"\n' "$name" "$selected"
+        done <"$rules"
+        printf '\n[resolved]\n'
+    } >"$output"
+else
+    {
+        printf '# package requirement\n'
+        while IFS=$'\t' read -r name selected; do
+            printf '%s %s\n' "$name" "$selected"
+        done <"$rules"
+    } >"$output"
+fi
 
 printf 'baseline 已生成：%s\n' "$output"
 printf '可直接提交并在项目的 .infra/dep/policy.toml 中引用该 release。\n'

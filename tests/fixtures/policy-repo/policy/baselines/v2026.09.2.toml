@@ -1,0 +1,7 @@
+format = 3
+
+[direct]
+num-bigint = "^0.4"
+
+[resolved]
+num-bigint = ">=0.4.8"

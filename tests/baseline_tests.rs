@@ -58,3 +58,27 @@ fn rejects_duplicate_or_malformed_text_rules() {
     let malformed = Baseline::parse("serde\n").expect_err("line without a requirement must be rejected");
     assert_eq!(malformed.code(), "DP103");
 }
+
+#[test]
+fn parses_direct_and_resolved_toml_rules() {
+    let baseline =
+        Baseline::parse_toml("format = 3\n\n[direct]\nserde = \"^1.0\"\n\n[resolved]\nrustls = \">=0.23.45\"\n")
+            .expect("TOML baseline");
+    assert_eq!(baseline.requirement("serde").expect("direct rule").text(), "^1.0");
+    assert_eq!(
+        baseline
+            .resolved_iter()
+            .find(|(name, _)| *name == "rustls")
+            .expect("resolved rule")
+            .1
+            .text(),
+        ">=0.23.45"
+    );
+}
+
+#[test]
+fn rejects_non_minimum_resolved_requirement() {
+    let error = Baseline::parse_toml("format = 3\n[resolved]\nrustls = \"^0.23\"\n")
+        .expect_err("caret is not a resolved minimum rule");
+    assert!(error.to_string().contains(">=MAJOR.MINOR.PATCH"));
+}

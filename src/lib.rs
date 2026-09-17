@@ -22,6 +22,7 @@ pub mod report;
 pub mod rules;
 pub mod source;
 pub mod sync;
+mod temporary_lockfile;
 
 pub use baseline::Baseline;
 pub use baseline::DependencyRequirement;

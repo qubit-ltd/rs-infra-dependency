@@ -34,4 +34,4 @@ runs:
         if [[ -n "$POLICY_GIT_TOKEN" ]]; then
           git config --global url."https://x-access-token:${POLICY_GIT_TOKEN}@github.com/".insteadOf "https://github.com/"
         fi
-        rs-infra-dependency --project "${{ inputs.project }}" check
+        rs-infra-dependency --project "${{ inputs.project }}" check --temporary-lockfile
