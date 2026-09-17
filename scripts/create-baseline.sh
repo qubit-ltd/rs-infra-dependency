@@ -66,7 +66,7 @@ roots=("${valid_roots[@]}")
 inventory=$(mktemp)
 rules=$(mktemp)
 trap 'rm -f "$inventory" "$rules"' EXIT
-args=(run --quiet -- inventory)
+args=(run --quiet --bin rs-infra-dependency -- inventory)
 for root in "${roots[@]}"; do args+=(--root "$root"); done
 args+=(--format json --output "$inventory")
 (cd "$repo_dir" && cargo "${args[@]}")

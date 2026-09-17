@@ -75,7 +75,7 @@ roots=("${valid_roots[@]}")
 ((${#roots[@]} > 0)) || { printf '没有可扫描的 Rust 项目。\n' >&2; exit 2; }
 
 mkdir -p "$(dirname -- "$output")"
-args=(run --quiet -- inventory)
+args=(run --quiet --bin rs-infra-dependency -- inventory)
 for root in "${roots[@]}"; do
     args+=(--root "$root")
 done
