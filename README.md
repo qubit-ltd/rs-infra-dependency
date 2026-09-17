@@ -8,9 +8,9 @@
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
 `rs-infra-dependency` gives an organization one small, readable baseline for
-all third-party *direct* Rust dependencies. It makes every governed manifest
-declare the same Cargo version requirement without attempting to replace Cargo's
-resolver or manage the transitive dependency graph.
+third-party Rust dependencies. It keeps direct declarations consistent and can
+also require minimum versions for selected resolved packages such as security-
+sensitive transitive dependencies, without replacing Cargo's resolver.
 
 For example, a policy can require `num-bigint 0.4` across libraries, private
 crates, and applications. Every project then declares `num-bigint = "0.4"`;
@@ -46,7 +46,7 @@ level below. The generator ignores `path` and `workspace` dependencies, and
 uses caller-supplied prefixes for published first-party crates. For each
 conflicting external dependency, it asks once which Cargo requirement to use.
 It writes an immediately usable, sorted file at
-`policy/baselines/<release>.txt`:
+`policy/baselines/<release>.txt` (use a `.toml` output name for the new format):
 
 ```text
 # package requirement
@@ -55,8 +55,27 @@ num-bigint 0.4
 serde 1.0
 ```
 
-There is no profile, exception, resolved-graph, or lockfile rule. A non-comment
-line has exactly two fields: the package name and a Cargo version requirement.
+The legacy text format has no profile, exception, resolved-graph, or lockfile
+rule. A non-comment line has exactly two fields: the package name and a Cargo
+version requirement.
+
+The TOML format separates direct declarations from selected resolved-package
+minimums:
+
+```toml
+format = 3
+
+[direct]
+reqwest = "^0.13"
+serde = "^1.0"
+
+[resolved]
+rustls = ">=0.23.45"
+```
+
+`[direct]` rules apply to `Cargo.toml`. `[resolved]` rules apply to every
+matching package version recorded in the workspace `Cargo.lock`; a package
+that is not present is allowed. Existing `.txt` baselines remain direct-only.
 
 ## Adopt and enforce it
 
@@ -71,7 +90,8 @@ baseline = "v2026.09.13"
 internal-prefixes = ["acme-", "acme_"]
 ```
 
-`revision` is the full immutable Git SHA containing the selected `.txt` file.
+`revision` is the full immutable Git SHA containing the selected `.txt` or
+`.toml` file.
 The checker detached-checks-out that commit. `file://` sources work for local
 development.
 
@@ -88,6 +108,20 @@ or declaring a different requirement (`DP202`). `sync` updates standard
 `[dependencies]`, `[dev-dependencies]`, and `[build-dependencies]` entries while
 preserving inline-table features; it does not change path/workspace dependencies.
 
+When a TOML baseline has `[resolved]` rules, `check` validates the complete
+locked graph with `cargo metadata --locked`. A checked-in `Cargo.lock` is never
+changed by the checker. Library projects without a lock file use the reusable
+Action's temporary lock-file mode; local checks can opt in explicitly:
+
+```bash
+rs-infra-dependency --project . check --temporary-lockfile
+```
+
+The temporary `Cargo.lock` is generated at the workspace root and removed after
+the check. A resolved rule is a minimum version, for example `rustls >=0.23.45`;
+all matching versions must satisfy it, while projects that do not use `rustls`
+pass that rule.
+
 Use the reusable Action in GitHub CI:
 
 ```yaml
@@ -99,8 +133,10 @@ Use the reusable Action in GitHub CI:
 
 ## Patch upgrades and limits
 
-The baseline is a uniform declaration policy, not a lockfile or resolver
-policy. `num-bigint 0.4` permits Cargo's compatible `0.4.x` updates. Applications
+The direct baseline is a uniform declaration policy. `num-bigint 0.4` permits
+Cargo's compatible `0.4.x` updates. Selected resolved rules protect minimum
+versions in the lockfile without forcing every project to use exactly one
+version. Applications
 that commit `Cargo.lock` should run their usual upgrade verification after a
 patch release:
 
@@ -111,8 +147,10 @@ cargo test
 
 Changing a minor or major line is deliberate: change the central baseline,
 commit it, update each project pointer to that commit, run `sync`, and validate.
-The tool does not constrain transitive packages, duplicate transitive versions,
-features, source registries, or lockfile contents.
+The tool does not automatically update transitive packages or replace Cargo's
+resolver. It checks every matching lockfile version, including duplicates and
+entries for other target platforms; `cargo audit` remains responsible for
+advisories not yet represented in the baseline.
 
 ## Inventory
 
