@@ -46,10 +46,10 @@ pub fn run_cli(mut arguments: Vec<std::ffi::OsString>) {
     let cli = Cli::parse_from(arguments);
     let command = cli.command_name();
     match cli.execute() {
-        Ok(()) => eprintln!("rs-infra-dependency: {command} succeeded"),
+        Ok(()) => eprintln!("✅ rs-infra-dependency: {command} succeeded"),
         Err(error) => {
             eprintln!("{error}");
-            eprintln!("rs-infra-dependency: {command} failed");
+            eprintln!("❌ rs-infra-dependency: {command} failed");
             std::process::exit(if matches!(error.code(), "DP001" | "DP101") {
                 1
             } else {

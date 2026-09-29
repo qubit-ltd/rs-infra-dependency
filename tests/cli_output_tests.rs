@@ -33,7 +33,7 @@ fn test_cli_success_reports_completion() {
 
     assert!(output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("rs-infra-dependency: inventory succeeded"));
+    assert!(stderr.contains("✅ rs-infra-dependency: inventory succeeded"));
 }
 
 #[test]
@@ -45,7 +45,7 @@ fn test_cli_failure_reports_failure() {
 
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("rs-infra-dependency: check failed"));
+    assert!(stderr.contains("❌ rs-infra-dependency: check failed"));
 }
 
 #[test]
