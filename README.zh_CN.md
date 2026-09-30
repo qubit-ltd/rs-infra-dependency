@@ -63,7 +63,7 @@ rustls = ">=0.23.45"
 ## 接入与检查
 
 将基线提交到策略仓库后，每个受治理仓库只保存下面的指针配置
-`.infra/dep/policy.toml`，无需复制基线内容：
+`.infra/dependency/policy.toml`，无需复制基线内容：
 
 ```toml
 format = 2

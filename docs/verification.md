@@ -6,7 +6,7 @@
 
 ## 已验证
 
-- 配置加载：默认 .infra/dep/ 路径、缺失文件、非法 revision 和 profile。
+- 配置加载：默认 .infra/dependency/ 路径、缺失文件、非法 revision 和 profile。
 - 基线加载：本地 policy source、release 选择和 schema 校验。
 - 规则：直接依赖版本漂移、application 缺少 Cargo.lock、禁止 num-bigint 0.5.x。
 - 报告：JSON 与 Markdown。

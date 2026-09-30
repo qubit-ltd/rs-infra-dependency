@@ -80,7 +80,7 @@ that is not present is allowed. Existing `.txt` baselines remain direct-only.
 ## Adopt and enforce it
 
 Commit the baseline in a policy repository. Each governed repository keeps only
-the following pointer at `.infra/dep/policy.toml`; it never copies the baseline:
+the following pointer at `.infra/dependency/policy.toml`; it never copies the baseline:
 
 ```toml
 format = 2

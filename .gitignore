@@ -1,3 +1,5 @@
 /target/
-/.infra/tools/bin/
+/.infra/*/bin/
 /.worktrees/
+/.infra/*/.crates*
+/.infra/*/tool.revision*

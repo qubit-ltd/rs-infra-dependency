@@ -116,4 +116,4 @@ else
 fi
 
 printf 'baseline 已生成：%s\n' "$output"
-printf '可直接提交并在项目的 .infra/dep/policy.toml 中引用该 release。\n'
+printf '可直接提交并在项目的 .infra/dependency/policy.toml 中引用该 release。\n'

@@ -13,7 +13,7 @@ use serde::Deserialize;
 
 use crate::PolicyError;
 
-/// Project configuration loaded from `.infra/dep/policy.toml`.
+/// Project configuration loaded from `.infra/dependency/policy.toml`.
 ///
 /// # Examples
 ///
@@ -49,8 +49,8 @@ impl ProjectConfig {
     /// Loads and validates the project policy configuration.
     ///
     /// When `override_path` is `None`, this reads
-    /// `.infra/dep/policy.toml` below `project_root`; otherwise it reads the
-    /// explicitly supplied path.
+    /// `.infra/dependency/policy.toml` below `project_root`; otherwise it reads
+    /// the explicitly supplied path.
     ///
     /// # Errors
     ///
@@ -68,7 +68,7 @@ impl ProjectConfig {
     pub fn load(project_root: &Utf8Path, override_path: Option<&Utf8Path>) -> Result<Self, PolicyError> {
         let path = override_path
             .map(Utf8Path::to_owned)
-            .unwrap_or_else(|| project_root.join(".infra/dep/policy.toml"));
+            .unwrap_or_else(|| project_root.join(".infra/dependency/policy.toml"));
         let text = std::fs::read_to_string(path.as_std_path()).map_err(|source| PolicyError::ReadConfig {
             path: path.to_string(),
             source,
