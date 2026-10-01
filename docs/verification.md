@@ -15,4 +15,4 @@
 
 ## 当前边界
 
-本阶段尚未接入现有 rs-ci，尚未迁移任何业务仓库，尚未实际回退 rs-budget，也尚未实现远程 Git source 的网络抓取。num-bigint 规则已能在 fixture 中发现 0.5.x，并生成受限版本同步计划；涉及别名、桥接代码和公开 API 的变更必须由专门 PR 完成。
+本阶段尚未接入现有 rs-infra-ci，尚未迁移任何业务仓库，尚未实际回退 rs-budget，也尚未实现远程 Git source 的网络抓取。num-bigint 规则已能在 fixture 中发现 0.5.x，并生成受限版本同步计划；涉及别名、桥接代码和公开 API 的变更必须由专门 PR 完成。
