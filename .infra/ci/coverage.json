@@ -1,5 +1,4 @@
 {
-  "scope": "package",
   "thresholds": {
     "lines": 67,
     "functions": 58,
