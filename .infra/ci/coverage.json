@@ -1,0 +1,8 @@
+{
+  "scope": "package",
+  "thresholds": {
+    "lines": 67,
+    "functions": 58,
+    "regions": 71
+  }
+}
