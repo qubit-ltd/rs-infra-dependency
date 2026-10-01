@@ -19,8 +19,6 @@ use serde::Serialize;
 
 use crate::PolicyError;
 
-// qubit-style: allow type-file-name
-
 /// A resolved package represented in a policy report.
 ///
 /// # Examples

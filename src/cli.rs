@@ -59,8 +59,6 @@ pub fn run_cli(mut arguments: Vec<std::ffi::OsString>) {
     }
 }
 
-// qubit-style: allow multiple-public-types
-
 /// Command-line arguments for rs-infra-dependency.
 ///
 /// # Examples

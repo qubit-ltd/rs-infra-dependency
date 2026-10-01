@@ -1,31 +1,46 @@
 format = 1
 
 [[exceptions]]
-rule = "type-file-name"
-path = "src/diagnostic.rs"
-reason = "Violation is the shared diagnostic payload for policy evaluation."
-
-[[exceptions]]
 rule = "public-type-layout"
-path = "src/inventory.rs"
-reason = "Inventory report types are intentionally co-located with the scanner."
+path = "src/baseline.rs"
+reason = "Baseline schema types are tightly coupled and serialized together."
 
 [[exceptions]]
 rule = "public-type-layout"
 path = "src/cli.rs"
-reason = "CLI command and output types form one public command contract."
+reason = "CLI argument types form one clap command schema."
 
 [[exceptions]]
-rule = "type-file-name"
-path = "src/source.rs"
-reason = "LoadedBaseline is the source loading result and stays with its loader."
+rule = "public-type-layout"
+path = "src/config.rs"
+reason = "Configuration types form one deserialization schema."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/inventory.rs"
+reason = "Inventory result types are one public scan model."
 
 [[exceptions]]
 rule = "public-type-layout"
 path = "src/report.rs"
-reason = "Report data and rendering types are intentionally co-located."
+reason = "Report types are one public serialization model."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/sync.rs"
+reason = "Synchronization plan types are one public planning model."
 
 [[exceptions]]
 rule = "type-file-name"
 path = "src/cargo.rs"
 reason = "ResolvedPackage belongs to the Cargo metadata adapter."
+
+[[exceptions]]
+rule = "type-file-name"
+path = "src/diagnostic.rs"
+reason = "Violation is the shared diagnostic payload for policy evaluation."
+
+[[exceptions]]
+rule = "type-file-name"
+path = "src/source.rs"
+reason = "LoadedBaseline is the source loading result and stays with its loader."

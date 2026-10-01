@@ -21,8 +21,6 @@ use crate::Baseline;
 use crate::PolicyError;
 use crate::ProjectConfig;
 
-// qubit-style: allow type-file-name
-
 /// A baseline together with the source commit used to load it.
 ///
 /// # Examples

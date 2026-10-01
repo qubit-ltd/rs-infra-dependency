@@ -17,8 +17,6 @@ use serde::Serialize;
 
 use crate::PolicyError;
 
-// qubit-style: allow multiple-public-types
-
 /// A dependency declared by a package in an inventory scan.
 ///
 /// # Examples

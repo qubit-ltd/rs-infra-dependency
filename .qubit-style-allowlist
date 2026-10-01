@@ -1,6 +1,0 @@
-multiple-public-types | src/baseline.rs | Baseline schema types are tightly coupled and serialized together.
-multiple-public-types | src/cli.rs | CLI argument types form one clap command schema.
-multiple-public-types | src/config.rs | Configuration types form one deserialization schema.
-multiple-public-types | src/inventory.rs | Inventory result types are one public scan model.
-multiple-public-types | src/report.rs | Report types are one public serialization model.
-multiple-public-types | src/sync.rs | Synchronization plan types are one public planning model.

@@ -14,8 +14,6 @@ use crate::Evaluation;
 use crate::LoadedBaseline;
 use crate::PolicyError;
 
-// qubit-style: allow multiple-public-types
-
 /// Stable identity of the baseline used for a report.
 ///
 /// # Examples

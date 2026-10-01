@@ -10,8 +10,6 @@
 
 use serde::Serialize;
 
-// qubit-style: allow type-file-name
-
 /// A policy violation with a stable machine-readable code.
 ///
 /// # Examples
