@@ -23,6 +23,8 @@ jobs:
           toolchain: 1.94.0
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov --version 0.8.6 --locked
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
       - name: Install pinned nightly components
         run: rustup toolchain install nightly-2026-06-05 --profile minimal --component rustfmt --component clippy
       - run: ./.infra/bin/align-ci.sh
