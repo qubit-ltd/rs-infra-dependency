@@ -70,6 +70,19 @@ pub struct LoadedBaseline {
 ///
 /// Returns the parsed baseline and the selected source commit.
 pub fn load_baseline(reference: &ProjectConfig, cache: &Utf8Path) -> Result<LoadedBaseline, PolicyError> {
+    if let Some(root) = std::env::var_os("RS_INFRA_DEPENDENCY_POLICY_ROOT") {
+        let root = Utf8PathBuf::from_path_buf(root.into()).map_err(|_| PolicyError::Source {
+            message: "dynamic policy source path is not valid UTF-8".into(),
+        })?;
+        let root = absolute_path(&root)?;
+        let commit = run_git(&root, &["rev-parse", "HEAD"])?;
+        return load_baseline_from_root(reference, root, commit);
+    }
+    if reference.source.is_empty() || reference.revision.is_empty() {
+        return Err(PolicyError::Source {
+            message: "dynamic policy source is unavailable; run rs-infra-dependency through rs-infra-tools".into(),
+        });
+    }
     let source = Url::parse(&reference.source).map_err(|error| PolicyError::Source {
         message: format!("invalid policy source URL: {error}"),
     })?;
@@ -84,7 +97,7 @@ pub fn load_baseline(reference: &ProjectConfig, cache: &Utf8Path) -> Result<Load
             });
         }
     };
-    load_baseline_from_root(reference, root)
+    load_baseline_from_root(reference, root, reference.revision.clone())
 }
 
 /// Converts a file URL into the UTF-8 local path containing the baseline.
@@ -177,7 +190,11 @@ fn run_git_in(directory: &Utf8Path, arguments: &[&str]) -> Result<String, Policy
 }
 
 /// Reads and validates the selected baseline file from a source root.
-fn load_baseline_from_root(reference: &ProjectConfig, root: Utf8PathBuf) -> Result<LoadedBaseline, PolicyError> {
+fn load_baseline_from_root(
+    reference: &ProjectConfig,
+    root: Utf8PathBuf,
+    commit: String,
+) -> Result<LoadedBaseline, PolicyError> {
     let directory = root.join("policy/baselines");
     let toml_path = directory.join(format!("{}.toml", reference.baseline));
     let text_path = directory.join(format!("{}.txt", reference.baseline));
@@ -204,7 +221,7 @@ fn load_baseline_from_root(reference: &ProjectConfig, root: Utf8PathBuf) -> Resu
         Baseline::parse(&text)?
     };
     Ok(LoadedBaseline {
-        commit: reference.revision.clone(),
+        commit,
         release: reference.baseline.clone(),
         baseline,
     })

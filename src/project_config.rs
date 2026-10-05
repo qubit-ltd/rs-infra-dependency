@@ -13,7 +13,7 @@ use serde::Deserialize;
 
 use crate::PolicyError;
 
-/// Project configuration loaded from `.infra/dependency/policy.toml`.
+/// Project-owned policy selection loaded from `.infra/dependency/policy.toml`.
 ///
 /// # Examples
 ///
@@ -22,8 +22,8 @@ use crate::PolicyError;
 ///
 /// let config = ProjectConfig {
 ///     format: 2,
-///     source: "file:///tmp/policy".into(),
-///     revision: "0123456789abcdef0123456789abcdef01234567".into(),
+///     source: String::new(),
+///     revision: String::new(),
 ///     baseline: "v2026.09.0".into(),
 ///     internal_prefixes: vec!["acme-".into()],
 /// };
@@ -34,9 +34,11 @@ use crate::PolicyError;
 pub struct ProjectConfig {
     /// Configuration schema version; currently this must be `2`.
     pub format: u32,
-    /// Git or local URL of the policy repository containing the baseline.
+    /// Optional legacy source URL; new projects use the dynamically cached source.
+    #[serde(default)]
     pub source: String,
-    /// Full Git commit SHA selecting immutable policy contents.
+    /// Optional legacy Git commit SHA selecting immutable policy contents.
+    #[serde(default)]
     pub revision: String,
     /// Name of the selected baseline file without its `.txt` suffix.
     pub baseline: String,
@@ -103,7 +105,7 @@ impl ProjectConfig {
                 .any(|prefix| dependency.name.starts_with(prefix))
     }
 
-    /// Validates the schema version, release name, and immutable revision.
+    /// Validates the schema version, release name, and optional legacy revision.
     fn validate(self) -> Result<Self, PolicyError> {
         if self.format != 2 {
             return Err(PolicyError::InvalidConfig {
@@ -117,12 +119,32 @@ impl ProjectConfig {
                 message: "baseline must be a simple release name".into(),
             });
         }
-        if self.revision.len() != 40 || !self.revision.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        if !self.revision.is_empty()
+            && (self.revision.len() != 40 || !self.revision.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        {
             return Err(PolicyError::InvalidConfig {
                 code: "DP001",
                 message: "revision must be a 40-digit hexadecimal commit SHA".into(),
             });
         }
         Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ProjectConfig;
+
+    #[test]
+    fn project_policy_can_select_a_baseline_without_pinning_its_source() {
+        let config: ProjectConfig = toml::from_str(
+            "format = 2\nbaseline = \"v2026.09.14\"\ninternal-prefixes = [\"qubit-\"]\n",
+        )
+        .unwrap();
+
+        let config = config.validate().unwrap();
+        assert_eq!(config.baseline, "v2026.09.14");
+        assert!(config.source.is_empty());
+        assert!(config.revision.is_empty());
     }
 }
