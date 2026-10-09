@@ -4,7 +4,7 @@ set -euo pipefail
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 repo_dir=$(cd -- "${script_dir}/.." && pwd)
 release="v$(date +%Y.%m.%d)"
-output="${repo_dir}/policy/baselines/${release}.txt"
+output="${repo_dir}/conf/policy/baselines/${release}.txt"
 roots=()
 internal_prefixes=()
 
@@ -116,4 +116,4 @@ else
 fi
 
 printf 'baseline 已生成：%s\n' "$output"
-printf '可直接提交并在项目的 .infra/dependency/policy.toml 中引用该 release。\n'
+printf '请审查基线，并更新 conf/policy/current.toml 和 conf/manifest.json 中的当前版本。\n'

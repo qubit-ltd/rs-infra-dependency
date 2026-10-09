@@ -18,7 +18,7 @@ use crate::ProjectConfig;
 use crate::Report;
 use crate::apply_sync;
 use crate::evaluate;
-use crate::load_baseline;
+use crate::load_project_baseline;
 use crate::plan_sync;
 use crate::render_inventory_json;
 use crate::render_inventory_markdown;
@@ -203,7 +203,7 @@ impl Cli {
             return Ok(());
         }
         let config = self.load_config()?;
-        let baseline = load_baseline(&config, &self.project.join("target/policy-cache"))?;
+        let baseline = load_project_baseline(&self.project)?;
         let needs_lock =
             baseline.baseline.has_resolved_rules() && matches!(self.command, Command::Check | Command::Report { .. });
         let temporary_lockfile = TemporaryLockfile::prepare(&self.project, needs_lock, self.temporary_lockfile)?;

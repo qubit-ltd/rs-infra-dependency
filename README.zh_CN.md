@@ -36,7 +36,7 @@ cargo install --path .
 
 每个 `--root` 可以是 Rust 项目，也可以是其父目录；父目录会扫描一级子目录。脚本自动排除 `path`、`workspace` 依赖；已发布但仍属内部生态的 crate 通过调用方传入的 `--internal-prefix` 识别。发现同一个外部依赖存在不同声明时，脚本只询问一次应选择哪个 Cargo 版本要求。
 
-结果默认写为可用且排序稳定的 `policy/baselines/<release>.txt`；输出文件名使用 `.toml` 时生成新格式：
+结果默认写为可用且排序稳定的 `conf/policy/baselines/<release>.txt`；输出文件名使用 `.toml` 时生成新格式：
 
 ```text
 # package requirement
@@ -62,18 +62,24 @@ rustls = ">=0.23.45"
 
 ## 接入与检查
 
-将基线提交到策略仓库后，每个受治理仓库只保存下面的指针配置
-`.infra/dependency/policy.toml`，无需复制基线内容：
+审核生成的基线后，在 `conf/policy/current.toml` 指定当前版本，并将对应文件
+列入 `conf/manifest.json`。各项目通过更新脚本从本仓库 `main` 安装统一策略、
+当前版本指针和相应基线：
 
-```toml
-format = 2
-source = "https://github.com/example/rust-infra.git"
-revision = "0123456789abcdef0123456789abcdef01234567"
-baseline = "v2026.09.13"
-internal-prefixes = ["acme-", "acme_"]
+```bash
+./update-infra.sh --yes
 ```
 
-`revision` 是包含该 `.txt` 或 `.toml` 基线文件的完整、不可变 Git SHA；检查器会 detached checkout 到该提交。本地调试也可以使用 `file://` source。
+安装后的 `.infra/dependency/policy.toml` 包含统一设置：
+
+```toml
+format = 3
+internal-prefixes = ["qubit-"]
+```
+
+项目不能自行选择基线版本。检查器读取项目中的
+`.infra/dependency/policy/current.toml` 和对应的版本文件；文件缺失或无效时
+检查失败。报告会记录实际读取的版本及文件内容摘要。
 
 检查和同步单个项目：
 
@@ -113,7 +119,11 @@ cargo update
 cargo test
 ```
 
-升级 minor 或 major 必须有意进行：先改中心基线、提交该基线、让各项目指向新提交、执行 `sync`，再验证。工具不会自动升级传递依赖，也不会替代 Cargo 的解析器；它会逐一检查锁文件中的重复版本和其他目标平台条目。`cargo audit` 继续负责发现尚未登记到基线的安全公告。
+升级 minor 或 major 必须有意进行：先改中心基线及
+`conf/policy/current.toml`、`conf/manifest.json`，再在各项目运行
+`update-infra.sh`、执行 `sync` 并验证。工具不会自动升级传递依赖，也不会
+替代 Cargo 的解析器；它会逐一检查锁文件中的重复版本和其他目标平台条目。
+`cargo audit` 继续负责发现尚未登记到基线的安全公告。
 
 ## 依赖盘点
 

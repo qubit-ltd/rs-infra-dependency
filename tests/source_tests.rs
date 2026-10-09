@@ -12,6 +12,7 @@ use camino::Utf8Path;
 use camino::Utf8PathBuf;
 use qubit_infra_dependency::ProjectConfig;
 use qubit_infra_dependency::load_baseline;
+use qubit_infra_dependency::load_project_baseline;
 use tempfile::TempDir;
 use tempfile::tempdir;
 
@@ -35,6 +36,33 @@ fn run_git(directory: &Utf8Path, arguments: &[&str]) -> String {
 
 fn baseline(requirement: &str) -> String {
     format!("num-bigint {requirement}\n")
+}
+
+#[test]
+fn test_project_baseline_uses_installed_current_policy() {
+    let temporary = tempdir().expect("temporary project");
+    let project = Utf8Path::from_path(temporary.path()).expect("UTF-8 project path");
+    let policy = project.join(".infra/dependency/policy");
+    std::fs::create_dir_all(policy.join("baselines")).expect("baseline directory");
+    std::fs::write(policy.join("current.toml"), "baseline = \"v2026.10.06.1\"\n")
+        .expect("current policy");
+    std::fs::write(
+        policy.join("baselines/v2026.10.06.1.txt"),
+        baseline("^0.4"),
+    )
+    .expect("installed baseline");
+
+    let loaded = load_project_baseline(project).expect("installed project baseline");
+    assert_eq!(loaded.release, "v2026.10.06.1");
+    assert!(loaded.commit.starts_with("sha256:"));
+    assert_eq!(
+        loaded
+            .baseline
+            .requirement("num-bigint")
+            .expect("num-bigint rule")
+            .text(),
+        "^0.4"
+    );
 }
 
 fn create_remote() -> (TempDir, Utf8PathBuf, String) {

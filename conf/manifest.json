@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "files": [
+    {
+      "source": "policy.toml",
+      "target": "policy.toml"
+    },
+    {
+      "source": "policy/current.toml",
+      "target": "policy/current.toml"
+    },
+    {
+      "source": "policy/baselines/v2026.10.06.1.txt",
+      "target": "policy/baselines/v2026.10.06.1.txt"
+    }
+  ]
+}

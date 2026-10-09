@@ -15,13 +15,16 @@ use std::process::Command;
 
 use camino::Utf8Path;
 use camino::Utf8PathBuf;
+use serde::Deserialize;
+use sha2::Digest;
+use sha2::Sha256;
 use url::Url;
 
 use crate::Baseline;
 use crate::PolicyError;
 use crate::ProjectConfig;
 
-/// A baseline together with the source commit used to load it.
+/// A baseline together with the revision or content digest used to load it.
 ///
 /// # Examples
 ///
@@ -39,12 +42,93 @@ use crate::ProjectConfig;
 /// ```
 #[derive(Debug, Clone)]
 pub struct LoadedBaseline {
-    /// Commit SHA recorded by the project configuration.
+    /// Git commit for a legacy source, or SHA-256 digest for a project copy.
     pub commit: String,
-    /// Baseline release selected by the project configuration.
+    /// Baseline release selected by the shared current-policy file.
     pub release: String,
     /// Parsed and validated baseline.
     pub baseline: Baseline,
+}
+
+/// Shared current-policy pointer installed beside the project baseline.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CurrentPolicy {
+    /// Release name shared by all projects after an infrastructure update.
+    baseline: String,
+}
+
+/// Loads the current baseline installed inside one project.
+///
+/// The project has no baseline selection of its own. This reads the shared
+/// `current.toml` pointer and its versioned baseline under `.infra/dependency`.
+/// The returned identity contains a SHA-256 digest of the installed bytes.
+///
+/// # Errors
+///
+/// Returns a configuration or baseline error if the pointer is missing or
+/// malformed, if its release name is unsafe, or if the selected file is
+/// missing or invalid. No network access occurs.
+pub fn load_project_baseline(project: &Utf8Path) -> Result<LoadedBaseline, PolicyError> {
+    let root = project.join(".infra/dependency/policy");
+    let current_path = root.join("current.toml");
+    let current_text = std::fs::read_to_string(current_path.as_std_path()).map_err(|source| {
+        PolicyError::ReadConfig {
+            path: current_path.to_string(),
+            source,
+        }
+    })?;
+    let current: CurrentPolicy = toml::from_str(&current_text).map_err(|source| PolicyError::ParseConfig {
+        path: current_path.to_string(),
+        source,
+    })?;
+    if current.baseline.is_empty()
+        || !current
+            .baseline
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'_'))
+    {
+        return Err(PolicyError::InvalidConfig {
+            code: "DP001",
+            message: format!("invalid shared baseline release in {current_path}"),
+        });
+    }
+    let directory = root.join("baselines");
+    let toml_path = directory.join(format!("{}.toml", current.baseline));
+    let text_path = directory.join(format!("{}.txt", current.baseline));
+    let baseline_path = match (toml_path.is_file(), text_path.is_file()) {
+        (true, false) => toml_path,
+        (false, true) => text_path,
+        (true, true) => {
+            return Err(PolicyError::Baseline {
+                message: format!("both {toml_path} and {text_path} exist"),
+            });
+        }
+        (false, false) => {
+            return Err(PolicyError::Baseline {
+                message: format!(
+                    "baseline file is missing: {toml_path} or {text_path}; run ./update-infra.sh"
+                ),
+            });
+        }
+    };
+    let bytes = std::fs::read(baseline_path.as_std_path()).map_err(|error| PolicyError::Baseline {
+        message: format!("failed to read {baseline_path}: {error}"),
+    })?;
+    let text = std::str::from_utf8(&bytes).map_err(|error| PolicyError::Baseline {
+        message: format!("baseline {baseline_path} is not UTF-8: {error}"),
+    })?;
+    let baseline = if baseline_path.extension() == Some("toml") {
+        Baseline::parse_toml(text)?
+    } else {
+        Baseline::parse(text)?
+    };
+    let digest = Sha256::digest(text.replace("\r\n", "\n").as_bytes());
+    Ok(LoadedBaseline {
+        commit: format!("sha256:{digest:x}"),
+        release: current.baseline,
+        baseline,
+    })
 }
 
 /// Loads a baseline from a local or Git policy source pinned to its revision.
@@ -195,7 +279,12 @@ fn load_baseline_from_root(
     root: Utf8PathBuf,
     commit: String,
 ) -> Result<LoadedBaseline, PolicyError> {
-    let directory = root.join("policy/baselines");
+    let shared_directory = root.join("conf/policy/baselines");
+    let directory = if shared_directory.is_dir() {
+        shared_directory
+    } else {
+        root.join("policy/baselines")
+    };
     let toml_path = directory.join(format!("{}.toml", reference.baseline));
     let text_path = directory.join(format!("{}.txt", reference.baseline));
     let baseline_path = match (toml_path.exists(), text_path.exists()) {

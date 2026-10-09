@@ -8,8 +8,6 @@
 
 use std::process::Command;
 
-use tempfile::NamedTempFile;
-
 fn binary() -> Command {
     Command::new(env!("CARGO_BIN_EXE_rs-infra-dependency"))
 }
@@ -41,26 +39,12 @@ fn test_cli_failure_reports_failure() {
 #[test]
 fn test_cli_generates_and_removes_a_temporary_lockfile() {
     let project = std::path::Path::new("tests/fixtures/application-no-lock");
-    let source = project
-        .canonicalize()
-        .expect("fixture project")
-        .join("../policy-repo")
-        .canonicalize()
-        .expect("fixture policy repository");
-    let config = NamedTempFile::new().expect("temporary policy config");
-    let config_text = format!(
-        "format = 2\nsource = \"file://{}\"\nrevision = \"0123456789abcdef0123456789abcdef01234567\"\nbaseline = \"v2026.09.2\"\n",
-        source.display()
-    );
-    std::fs::write(config.path(), config_text).expect("policy config");
     let lockfile = project.join("Cargo.lock");
     assert!(!lockfile.exists());
     let output = binary()
         .args([
             "--project",
             project.to_str().expect("project path"),
-            "--config",
-            config.path().to_str().expect("config path"),
             "check",
             "--temporary-lockfile",
         ])

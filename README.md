@@ -46,7 +46,7 @@ level below. The generator ignores `path` and `workspace` dependencies, and
 uses caller-supplied prefixes for published first-party crates. For each
 conflicting external dependency, it asks once which Cargo requirement to use.
 It writes an immediately usable, sorted file at
-`policy/baselines/<release>.txt` (use a `.toml` output name for the new format):
+`conf/policy/baselines/<release>.txt` (use a `.toml` output name for the new format):
 
 ```text
 # package requirement
@@ -79,21 +79,26 @@ that is not present is allowed. Existing `.txt` baselines remain direct-only.
 
 ## Adopt and enforce it
 
-Commit the baseline in a policy repository. Each governed repository keeps only
-the following pointer at `.infra/dependency/policy.toml`; it never copies the baseline:
+Review the generated baseline, then set its release in
+`conf/policy/current.toml` and list that versioned file in
+`conf/manifest.json`. The project updater installs the shared policy, current
+release pointer, and selected baseline from this repository's `main` branch:
 
-```toml
-format = 2
-source = "https://github.com/example/rust-infra.git"
-revision = "0123456789abcdef0123456789abcdef01234567"
-baseline = "v2026.09.13"
-internal-prefixes = ["acme-", "acme_"]
+```bash
+./update-infra.sh --yes
 ```
 
-`revision` is the full immutable Git SHA containing the selected `.txt` or
-`.toml` file.
-The checker detached-checks-out that commit. `file://` sources work for local
-development.
+The installed `.infra/dependency/policy.toml` contains the shared settings:
+
+```toml
+format = 3
+internal-prefixes = ["qubit-"]
+```
+
+Projects do not select a baseline. The checker reads the installed
+`.infra/dependency/policy/current.toml` and its versioned baseline file;
+missing or invalid files fail the check. Reports identify the actual installed
+baseline by release and content digest.
 
 Check and synchronize a project:
 
@@ -128,7 +133,6 @@ Use the reusable Action in GitHub CI:
 - uses: qubit-ltd/rs-infra-dependency/.github/actions/check@<tool-commit-sha>
   with:
     project: .
-    token: ${{ secrets.GITHUB_TOKEN }} # only for private policy sources
 ```
 
 ## Patch upgrades and limits
@@ -146,7 +150,8 @@ cargo test
 ```
 
 Changing a minor or major line is deliberate: change the central baseline,
-commit it, update each project pointer to that commit, run `sync`, and validate.
+update `conf/policy/current.toml` and `conf/manifest.json`, run each project's
+`update-infra.sh`, then run `sync` and validate.
 The tool does not automatically update transitive packages or replace Cargo's
 resolver. It checks every matching lockfile version, including duplicates and
 entries for other target platforms; `cargo audit` remains responsible for

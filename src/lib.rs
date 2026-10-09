@@ -8,7 +8,7 @@
 
 //! Public library API for checking and synchronizing direct Rust dependencies.
 //!
-//! The crate loads a project policy pointer, resolves its pinned baseline, and
+//! The crate loads a shared baseline installed in each project, and
 //! exposes evaluation, reporting, inventory, and manifest-synchronization APIs.
 
 pub mod baseline;
@@ -45,6 +45,7 @@ pub use rules::Evaluation;
 pub use rules::evaluate;
 pub use source::LoadedBaseline;
 pub use source::load_baseline;
+pub use source::load_project_baseline;
 pub use sync::FileEdit;
 pub use sync::LockUpdate;
 pub use sync::SyncPlan;

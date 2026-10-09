@@ -8,6 +8,38 @@
 
 use camino::Utf8Path;
 use qubit_infra_dependency::ProjectConfig;
+use tempfile::tempdir;
+
+#[test]
+fn loads_shared_policy_without_project_baseline_selection() {
+    let directory = tempdir().expect("temporary project");
+    let project = Utf8Path::from_path(directory.path()).expect("UTF-8 project path");
+    std::fs::create_dir_all(project.join(".infra/dependency")).expect("policy directory");
+    std::fs::write(
+        project.join(".infra/dependency/policy.toml"),
+        "format = 3\ninternal-prefixes = [\"qubit-\"]\n",
+    )
+    .expect("shared policy");
+
+    let config = ProjectConfig::load(project, None).expect("shared project policy");
+    assert_eq!(config.format, 3);
+    assert!(config.baseline.is_empty());
+}
+
+#[test]
+fn rejects_project_baseline_selection_in_shared_policy() {
+    let directory = tempdir().expect("temporary project");
+    let project = Utf8Path::from_path(directory.path()).expect("UTF-8 project path");
+    std::fs::create_dir_all(project.join(".infra/dependency")).expect("policy directory");
+    std::fs::write(
+        project.join(".infra/dependency/policy.toml"),
+        "format = 3\nbaseline = \"v2026.09.14\"\ninternal-prefixes = [\"qubit-\"]\n",
+    )
+    .expect("project policy");
+
+    let error = ProjectConfig::load(project, None).expect_err("project baseline selection must fail");
+    assert_eq!(error.code(), "DP001");
+}
 
 #[test]
 fn rejects_policy_without_a_40_digit_revision() {

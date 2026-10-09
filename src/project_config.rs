@@ -13,7 +13,10 @@ use serde::Deserialize;
 
 use crate::PolicyError;
 
-/// Project-owned policy selection loaded from `.infra/dependency/policy.toml`.
+/// Project policy settings loaded from `.infra/dependency/policy.toml`.
+///
+/// Format 3 has no project-selectable baseline. The baseline, source, and
+/// revision fields remain available only for legacy format 2 callers.
 ///
 /// # Examples
 ///
@@ -32,7 +35,7 @@ use crate::PolicyError;
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectConfig {
-    /// Configuration schema version; currently this must be `2`.
+    /// Configuration schema version; shared project policy uses `3`.
     pub format: u32,
     /// Optional legacy source URL; new projects use the dynamically cached source.
     #[serde(default)]
@@ -40,7 +43,8 @@ pub struct ProjectConfig {
     /// Optional legacy Git commit SHA selecting immutable policy contents.
     #[serde(default)]
     pub revision: String,
-    /// Name of the selected baseline file without its `.txt` suffix.
+    /// Legacy format 2 baseline selection; empty in shared format 3 policy.
+    #[serde(default)]
     pub baseline: String,
     /// Organization-defined prefixes identifying first-party published crates.
     #[serde(default, rename = "internal-prefixes")]
@@ -105,13 +109,22 @@ impl ProjectConfig {
                 .any(|prefix| dependency.name.starts_with(prefix))
     }
 
-    /// Validates the schema version, release name, and optional legacy revision.
+    /// Validates shared policy or the legacy pinned-source format.
     fn validate(self) -> Result<Self, PolicyError> {
-        if self.format != 2 {
+        if self.format != 2 && self.format != 3 {
             return Err(PolicyError::InvalidConfig {
                 code: "DP001",
                 message: format!("unsupported configuration format {}", self.format),
             });
+        }
+        if self.format == 3 {
+            if !self.baseline.is_empty() || !self.source.is_empty() || !self.revision.is_empty() {
+                return Err(PolicyError::InvalidConfig {
+                    code: "DP001",
+                    message: "shared policy does not allow a project baseline, source, or revision".into(),
+                });
+            }
+            return Ok(self);
         }
         if self.baseline.is_empty() || self.baseline.contains('/') || self.baseline.contains('\\') {
             return Err(PolicyError::InvalidConfig {
