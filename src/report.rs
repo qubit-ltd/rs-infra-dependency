@@ -145,3 +145,29 @@ pub fn render_markdown(report: &Report) -> String {
     }
     output
 }
+
+#[cfg(test)]
+mod tests {
+    use super::BaselineIdentity;
+    use super::Report;
+    use super::render_json;
+    use super::render_markdown;
+
+    #[test]
+    fn renders_report_json_and_markdown_from_the_library_target() {
+        let report = Report {
+            schema_version: 1,
+            baseline: BaselineIdentity {
+                release: "v1".into(),
+                revision: "0123456789abcdef0123456789abcdef01234567".into(),
+                name: "v1".into(),
+            },
+            violations: Vec::new(),
+            packages: Vec::new(),
+        };
+
+        let json = render_json(&report).expect("report JSON");
+        assert!(json.contains("\"release\": \"v1\""));
+        assert!(render_markdown(&report).contains("No violations found."));
+    }
+}

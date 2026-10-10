@@ -225,3 +225,23 @@ fn is_package_name(name: &str) -> bool {
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Baseline;
+
+    #[test]
+    fn exposes_direct_and_resolved_requirements_through_library_iterators() {
+        let baseline =
+            Baseline::parse_toml("format = 3\n[direct]\nserde = \"^1.0\"\n[resolved]\nrustls = \">=0.23.45\"\n")
+                .expect("TOML baseline");
+
+        assert_eq!(baseline.requirement("serde").expect("serde").text(), "^1.0");
+        assert_eq!(baseline.iter().map(|(name, _)| name).collect::<Vec<_>>(), ["serde"]);
+        assert_eq!(
+            baseline.resolved_iter().map(|(name, _)| name).collect::<Vec<_>>(),
+            ["rustls"]
+        );
+        assert!(baseline.has_resolved_rules());
+    }
+}

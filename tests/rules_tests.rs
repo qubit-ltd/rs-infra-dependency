@@ -71,6 +71,44 @@ fn reports_an_external_direct_dependency_missing_from_the_baseline() {
 }
 
 #[test]
+fn skips_path_dependencies_classified_as_internal_by_prefix() {
+    let temporary = tempfile::tempdir().expect("temporary project");
+    let project = Utf8PathBuf::from_path_buf(temporary.path().to_owned()).expect("UTF-8 path");
+    std::fs::create_dir_all(project.join("src")).expect("source directory");
+    std::fs::write(project.join("src/lib.rs"), "").expect("source");
+    std::fs::write(
+        project.join("Cargo.toml"),
+        "[package]\nname = \"application\"\nversion = \"0.1.0\"\nedition = \"2021\"\n[dependencies]\nqubit-internal-util = { path = \"internal-util\" }\n",
+    )
+    .expect("application manifest");
+    std::fs::create_dir_all(project.join("internal-util/src")).expect("internal crate directory");
+    std::fs::write(
+        project.join("internal-util/Cargo.toml"),
+        "[package]\nname = \"qubit-internal-util\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    )
+    .expect("internal manifest");
+    std::fs::write(project.join("internal-util/src/lib.rs"), "").expect("internal source");
+    std::fs::create_dir_all(project.join(".infra/tools")).expect("tool defaults directory");
+    std::fs::write(
+        project.join(".infra/tools/defaults.toml"),
+        "build_toolchain = \"1.94.0\"\n",
+    )
+    .expect("tool defaults");
+    let mut config = config(&project);
+    config.internal_prefixes = vec!["qubit-internal-".into()];
+    let baseline = load_baseline(&config, Utf8Path::new("target/t3/cache")).expect("baseline");
+
+    let evaluation = evaluate(&project, &config, &baseline).expect("evaluation");
+
+    assert!(
+        !evaluation
+            .violations
+            .iter()
+            .any(|item| item.crate_name == "qubit-internal-util")
+    );
+}
+
+#[test]
 fn reports_a_resolved_package_below_its_minimum() {
     let project = Utf8PathBuf::from("tests/fixtures/num-bigint-04");
     let mut config = config(&project);

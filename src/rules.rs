@@ -133,3 +133,44 @@ fn check_direct_dependencies(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use camino::Utf8PathBuf;
+    use cargo_metadata::MetadataCommand;
+
+    use super::check_resolved_dependencies;
+    use crate::Baseline;
+    use crate::Violation;
+
+    #[test]
+    fn reports_resolved_packages_below_the_baseline_minimum() {
+        let temporary = tempfile::tempdir().expect("temporary project");
+        let project = Utf8PathBuf::from_path_buf(temporary.path().to_owned()).expect("UTF-8 project path");
+        std::fs::write(
+            project.join("Cargo.toml"),
+            "[package]\nname = \"rules-fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+        )
+        .expect("manifest");
+        std::fs::create_dir_all(project.join("src")).expect("source directory");
+        std::fs::write(project.join("src/lib.rs"), "").expect("source");
+
+        let metadata = MetadataCommand::new()
+            .manifest_path(project.join("Cargo.toml").as_std_path())
+            .no_deps()
+            .exec()
+            .expect("Cargo metadata");
+        let baseline = Baseline::parse_toml(
+            "format = 3\n[resolved]\nrules-fixture = \">=1.0.0\"\nmissing-package = \">=1.0.0\"\n",
+        )
+        .expect("resolved baseline");
+        let mut violations: Vec<Violation> = Vec::new();
+
+        check_resolved_dependencies(&metadata, &baseline, &mut violations);
+
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].code, "DP401");
+        assert_eq!(violations[0].crate_name, "rules-fixture");
+        assert!(violations[0].message.contains("from path"));
+    }
+}

@@ -15,6 +15,22 @@ fn binary() -> Command {
     Command::new(env!("CARGO_BIN_EXE_rs-infra-dependency"))
 }
 
+#[test]
+fn test_legacy_cargo_subcommand_binary_remains_available() {
+    let temporary = project_fixture();
+    write_defaults(temporary.path(), ".infra/tools/defaults.toml", "1.94.0");
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-dependency-policy"))
+        .args([
+            "dependency-policy",
+            "inventory",
+            "--root",
+            temporary.path().to_str().expect("UTF-8 project"),
+        ])
+        .output()
+        .expect("run compatibility entry point");
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+}
+
 fn project_fixture() -> TempDir {
     let temporary = tempfile::tempdir().expect("temporary project");
     let source = Path::new("tests/fixtures/application-no-lock");
@@ -76,8 +92,10 @@ fn write_defaults(project: &Path, relative: &str, toolchain: &str) {
 
 #[test]
 fn test_cli_success_reports_completion() {
+    let temporary = project_fixture();
+    write_defaults(temporary.path(), ".infra/tools/defaults.toml", "1.94.0");
     let output = binary()
-        .args(["inventory", "--root", "tests/fixtures/application-no-lock"])
+        .args(["inventory", "--root", temporary.path().to_str().expect("UTF-8 project")])
         .output()
         .expect("run inventory command");
 
@@ -88,8 +106,10 @@ fn test_cli_success_reports_completion() {
 
 #[test]
 fn test_cli_failure_reports_failure() {
+    let temporary = project_fixture();
+    write_defaults(temporary.path(), ".infra/tools/defaults.toml", "1.94.0");
     let output = binary()
-        .args(["--project", "tests/fixtures/application-no-lock", "check"])
+        .args(["--project", temporary.path().to_str().expect("UTF-8 project"), "check"])
         .output()
         .expect("run check command");
 
@@ -100,10 +120,18 @@ fn test_cli_failure_reports_failure() {
 
 #[test]
 fn test_cli_generates_and_removes_a_temporary_lockfile() {
-    let project = std::path::Path::new("tests/fixtures/application-no-lock");
+    let temporary = project_fixture();
+    let project = temporary.path();
+    write_defaults(project, ".infra/tools/defaults.toml", "1.94.0");
+    std::fs::write(
+        project.join("Cargo.toml"),
+        "[package]\nname = \"temporary-lockfile-cli-fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    )
+    .expect("dependency-free manifest");
     let lockfile = project.join("Cargo.lock");
     assert!(!lockfile.exists());
     let output = binary()
+        .env("CARGO_NET_OFFLINE", "true")
         .args([
             "--project",
             project.to_str().expect("project path"),
@@ -179,6 +207,129 @@ fn test_sync_does_not_require_tool_defaults() {
         .output()
         .expect("run sync planning");
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+}
+
+#[test]
+fn test_cli_reports_json_and_applies_sync_plan() {
+    let temporary = project_fixture();
+    let project = temporary.path();
+    write_defaults(project, ".infra/tools/defaults.toml", "1.94.0");
+    let manifest_path = project.join("Cargo.toml");
+    std::fs::write(
+        &manifest_path,
+        "[package]\nname = \"cli-report-fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    )
+    .expect("dependency-free manifest");
+    let report = binary()
+        .env("CARGO_NET_OFFLINE", "true")
+        .args([
+            "--project",
+            project.to_str().expect("UTF-8 project"),
+            "report",
+            "--format",
+            "json",
+            "--temporary-lockfile",
+        ])
+        .output()
+        .expect("run JSON report");
+    assert!(report.status.success(), "{}", String::from_utf8_lossy(&report.stderr));
+    assert!(String::from_utf8_lossy(&report.stdout).contains("schema_version"));
+    let markdown_report = binary()
+        .env("CARGO_NET_OFFLINE", "true")
+        .args([
+            "--project",
+            project.to_str().expect("UTF-8 project"),
+            "report",
+            "--format",
+            "markdown",
+            "--temporary-lockfile",
+        ])
+        .output()
+        .expect("run Markdown report");
+    assert!(
+        markdown_report.status.success(),
+        "{}",
+        String::from_utf8_lossy(&markdown_report.stderr)
+    );
+    assert!(String::from_utf8_lossy(&markdown_report.stdout).contains("Dependency Policy Report"));
+
+    std::fs::write(
+        &manifest_path,
+        "[package]\nname = \"cli-report-fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n[dependencies]\nnum-bigint = \"0.5\"\n",
+    )
+    .expect("out-of-policy manifest");
+    let sync = binary()
+        .args(["--project", project.to_str().expect("UTF-8 project"), "sync"])
+        .output()
+        .expect("apply sync");
+    assert!(sync.status.success(), "{}", String::from_utf8_lossy(&sync.stderr));
+    let updated_manifest = std::fs::read_to_string(manifest_path).expect("updated manifest");
+    assert!(updated_manifest.contains("num-bigint = \"^0.4\""));
+}
+
+#[test]
+fn test_inventory_writes_json_to_a_file_and_reports_write_errors() {
+    let temporary = project_fixture();
+    let project = temporary.path();
+    write_defaults(project, ".infra/tools/defaults.toml", "1.94.0");
+    let output_path = project.join("inventory.json");
+    let output = binary()
+        .args([
+            "inventory",
+            "--root",
+            project.to_str().expect("UTF-8 project"),
+            "--format",
+            "json",
+            "--output",
+            output_path.to_str().expect("UTF-8 output path"),
+        ])
+        .output()
+        .expect("write inventory JSON");
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        std::fs::read_to_string(&output_path)
+            .unwrap()
+            .contains("direct_requirements")
+    );
+
+    let bad_output = project.join("missing-parent/inventory.json");
+    let output = binary()
+        .args([
+            "inventory",
+            "--root",
+            project.to_str().expect("UTF-8 project"),
+            "--format",
+            "json",
+            "--output",
+            bad_output.to_str().expect("UTF-8 output path"),
+        ])
+        .output()
+        .expect("attempt inventory write to missing parent");
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("failed to read policy configuration"));
+}
+
+#[test]
+fn test_check_returns_a_policy_violation_for_a_requirement_drift() {
+    let temporary = project_fixture();
+    let project = temporary.path();
+    write_defaults(project, ".infra/tools/defaults.toml", "1.94.0");
+    std::fs::write(
+        project.join(".infra/dependency/policy/baselines/v2026.09.2.toml"),
+        "format = 3\n[direct]\nnum-bigint = \"^0.4\"\n",
+    )
+    .expect("direct-only baseline");
+    std::fs::write(
+        project.join("Cargo.toml"),
+        "[package]\nname = \"policy-violation-fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n[dependencies]\nnum-bigint = \"^0.5\"\n",
+    )
+    .expect("drifting dependency manifest");
+    let output = binary()
+        .args(["--project", project.to_str().expect("UTF-8 project"), "check"])
+        .output()
+        .expect("run check");
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("policy violation(s) found"));
 }
 
 #[test]

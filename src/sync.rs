@@ -172,3 +172,73 @@ pub fn apply_sync(plan: &SyncPlan) -> Result<(), PolicyError> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use camino::Utf8PathBuf;
+
+    use super::apply_sync;
+    use super::plan_sync;
+    use crate::Baseline;
+    use crate::FileEdit;
+    use crate::SyncPlan;
+
+    #[test]
+    fn applies_sync_edits_and_reports_read_and_parse_failures() {
+        let temporary = tempfile::tempdir().expect("temporary project");
+        let project = Utf8PathBuf::from_path_buf(temporary.path().to_owned()).expect("UTF-8 project path");
+        let manifest = project.join("Cargo.toml");
+        std::fs::write(&manifest, "[dependencies]\nserde = \"1.0\"\n").expect("manifest");
+        let baseline = Baseline::parse("serde 2.0\n").expect("baseline");
+        let plan = plan_sync(&project, &baseline).expect("sync plan");
+
+        apply_sync(&plan).expect("apply manifest edit");
+        assert!(
+            std::fs::read_to_string(&manifest)
+                .expect("updated manifest")
+                .contains("serde = \"2.0\"")
+        );
+
+        std::fs::write(&manifest, "not = [valid toml").expect("invalid manifest");
+        let parse_failure = SyncPlan {
+            manifest_edits: vec![FileEdit {
+                path: manifest.to_string(),
+                dependency: "serde".into(),
+                old: "1.0".into(),
+                new: "2.0".into(),
+            }],
+            lock_updates: Vec::new(),
+            blocked: Vec::new(),
+        };
+        assert!(apply_sync(&parse_failure).is_err());
+
+        let read_failure = SyncPlan {
+            manifest_edits: vec![FileEdit {
+                path: project.join("missing.toml").to_string(),
+                dependency: "serde".into(),
+                old: "1.0".into(),
+                new: "2.0".into(),
+            }],
+            lock_updates: Vec::new(),
+            blocked: Vec::new(),
+        };
+        assert!(apply_sync(&read_failure).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn reports_a_manifest_write_failure() {
+        let temporary = tempfile::tempdir().expect("temporary project");
+        let project = Utf8PathBuf::from_path_buf(temporary.path().to_owned()).expect("UTF-8 project path");
+        let manifest = project.join("Cargo.toml");
+        std::fs::write(&manifest, "[dependencies]\nserde = \"1.0\"\n").expect("manifest");
+        let plan = plan_sync(&project, &Baseline::parse("serde 2.0\n").expect("baseline")).expect("sync plan");
+        let mut permissions = std::fs::metadata(&manifest).expect("manifest metadata").permissions();
+        permissions.set_readonly(true);
+        std::fs::set_permissions(&manifest, permissions).expect("make manifest read-only");
+
+        let error = apply_sync(&plan).expect_err("read-only manifest cannot be updated");
+
+        assert!(error.to_string().contains("failed to write"));
+    }
+}

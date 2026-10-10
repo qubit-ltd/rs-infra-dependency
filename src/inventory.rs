@@ -257,3 +257,26 @@ pub fn render_inventory_markdown(inventory: &Inventory) -> String {
     }
     output
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::Inventory;
+    use super::render_inventory_json;
+    use super::render_inventory_markdown;
+
+    #[test]
+    fn renders_inventory_json_and_markdown_from_the_library_target() {
+        let inventory = Inventory {
+            schema_version: 1,
+            projects: Vec::new(),
+            direct_requirements: BTreeMap::from([("serde".into(), vec!["^1.0".into()])]),
+            conflicts: BTreeMap::new(),
+        };
+
+        let json = render_inventory_json(&inventory).expect("inventory JSON");
+        assert!(json.contains("serde"));
+        assert!(render_inventory_markdown(&inventory).contains("`^1.0`"));
+    }
+}

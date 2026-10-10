@@ -82,3 +82,35 @@ fn rejects_non_minimum_resolved_requirement() {
         .expect_err("caret is not a resolved minimum rule");
     assert!(error.to_string().contains(">=MAJOR.MINOR.PATCH"));
 }
+
+#[test]
+fn covers_baseline_iterators_and_invalid_input_paths() {
+    let baseline = Baseline::parse("zeta 2\nalpha 1\n").expect("baseline");
+    let entries = baseline
+        .iter()
+        .map(|(name, req)| (name.to_owned(), req.text().to_owned()))
+        .collect::<Vec<_>>();
+    assert_eq!(entries, [("alpha".into(), "1".into()), ("zeta".into(), "2".into())]);
+    assert!(!baseline.has_resolved_rules());
+
+    for input in ["serde 1.0 extra", "bad/name 1.0", "serde nope"] {
+        assert!(Baseline::parse(input).is_err(), "input should be rejected: {input}");
+    }
+    for input in ["broken", "format = 2", "format = 4"] {
+        assert!(
+            Baseline::parse_toml(input).is_err(),
+            "input should be rejected: {input}"
+        );
+    }
+    for input in [
+        "format = 3\n[direct]\n\"bad/name\" = \"1.0\"",
+        "format = 3\n[direct]\nserde = \"nope\"",
+        "format = 3\n[resolved]\nserde = \">=1.2\"",
+        "format = 3\n[resolved]\nserde = \">=1.2.3+build\"",
+    ] {
+        assert!(
+            Baseline::parse_toml(input).is_err(),
+            "input should be rejected: {input}"
+        );
+    }
+}

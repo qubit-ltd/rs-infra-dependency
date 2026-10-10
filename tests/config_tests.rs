@@ -62,3 +62,16 @@ fn reports_missing_configuration_file() {
         .expect_err("missing configuration must fail");
     assert_eq!(error.code(), "DP001");
 }
+
+#[test]
+fn loads_an_explicit_configuration_path_and_reports_parse_errors() {
+    let directory = tempdir().expect("temporary project");
+    let project = Utf8Path::from_path(directory.path()).expect("UTF-8 project path");
+    let override_path = project.join("custom-policy.toml");
+    std::fs::write(&override_path, "format = 3\ninternal-prefixes = [\"qubit-\"]\n").expect("override config");
+    let config = ProjectConfig::load(project, Some(&override_path)).expect("override config loads");
+    assert_eq!(config.format, 3);
+
+    std::fs::write(&override_path, "format = [\n").expect("invalid override config");
+    assert!(ProjectConfig::load(project, Some(&override_path)).is_err());
+}

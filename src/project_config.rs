@@ -37,7 +37,8 @@ use crate::PolicyError;
 pub struct ProjectConfig {
     /// Configuration schema version; shared project policy uses `3`.
     pub format: u32,
-    /// Optional legacy source URL; new projects use the dynamically cached source.
+    /// Optional legacy source URL; new projects use the dynamically cached
+    /// source.
     #[serde(default)]
     pub source: String,
     /// Optional legacy Git commit SHA selecting immutable policy contents.
@@ -150,14 +151,39 @@ mod tests {
 
     #[test]
     fn project_policy_can_select_a_baseline_without_pinning_its_source() {
-        let config: ProjectConfig = toml::from_str(
-            "format = 2\nbaseline = \"v2026.09.14\"\ninternal-prefixes = [\"qubit-\"]\n",
-        )
-        .unwrap();
+        let config: ProjectConfig =
+            toml::from_str("format = 2\nbaseline = \"v2026.09.14\"\ninternal-prefixes = [\"qubit-\"]\n").unwrap();
 
         let config = config.validate().unwrap();
         assert_eq!(config.baseline, "v2026.09.14");
         assert!(config.source.is_empty());
         assert!(config.revision.is_empty());
+    }
+
+    #[test]
+    fn rejects_unsupported_or_invalid_legacy_configurations() {
+        for text in [
+            "format = 1\nbaseline = \"v1\"",
+            "format = 2\nbaseline = \"\"",
+            "format = 2\nbaseline = \"../v1\"",
+            "format = 2\nbaseline = \"v1\"\nrevision = \"abc\"",
+            "format = 3\nbaseline = \"v1\"",
+        ] {
+            let config: ProjectConfig = toml::from_str(text).expect("valid TOML shape");
+            assert!(config.validate().is_err(), "configuration should fail: {text}");
+        }
+    }
+
+    #[test]
+    fn accepts_valid_legacy_revision_and_shared_config() {
+        let legacy: ProjectConfig = toml::from_str(&format!(
+            "format = 2\nbaseline = \"v1\"\nrevision = \"{}\"",
+            "a".repeat(40)
+        ))
+        .expect("legacy config");
+        assert!(legacy.validate().is_ok());
+
+        let shared: ProjectConfig = toml::from_str("format = 3").expect("shared config");
+        assert!(shared.validate().is_ok());
     }
 }
