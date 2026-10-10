@@ -16,6 +16,7 @@ use cargo_metadata::MetadataCommand;
 use serde::Serialize;
 
 use crate::PolicyError;
+use crate::cargo::build_toolchain;
 
 /// A dependency declared by a package in an inventory scan.
 ///
@@ -113,7 +114,8 @@ pub struct Inventory {
 ///
 /// # Errors
 ///
-/// Returns [`PolicyError::Cargo`] when Cargo cannot load metadata for a root.
+/// Returns a configuration error when a project has no usable tool defaults,
+/// or [`PolicyError::Cargo`] when Cargo cannot load metadata for a root.
 ///
 /// # Parameters
 ///
@@ -125,9 +127,11 @@ pub struct Inventory {
 pub fn scan_projects(projects: &[Utf8PathBuf]) -> Result<Inventory, PolicyError> {
     let mut scanned = Vec::with_capacity(projects.len());
     for project in projects {
+        let toolchain = build_toolchain(project)?;
         let manifest = project.join("Cargo.toml");
         let mut command = MetadataCommand::new();
         command.manifest_path(manifest.as_std_path());
+        command.env("RUSTUP_TOOLCHAIN", toolchain);
         let metadata = command.exec().map_err(|error| PolicyError::Cargo {
             code: "DP201",
             message: format!("{}: {}", project, error),

@@ -56,6 +56,12 @@ fn reports_an_external_direct_dependency_missing_from_the_baseline() {
     )
     .expect("manifest");
     std::fs::write(project.join("src/lib.rs").as_std_path(), "").expect("library source");
+    std::fs::create_dir_all(project.join(".infra/tools").as_std_path()).expect("defaults directory");
+    std::fs::write(
+        project.join(".infra/tools/defaults.toml").as_std_path(),
+        "build_toolchain = \"1.94.0\"\n",
+    )
+    .expect("tool defaults");
     let config = config(&project);
     let baseline = load_baseline(&config, Utf8Path::new("target/t3/cache")).expect("baseline");
 

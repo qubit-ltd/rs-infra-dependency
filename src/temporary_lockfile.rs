@@ -14,6 +14,7 @@ use camino::Utf8Path;
 use camino::Utf8PathBuf;
 
 use crate::PolicyError;
+use crate::cargo::build_toolchain;
 use crate::cargo::workspace_root;
 
 /// A lock file generated for one policy check and removed on cleanup.
@@ -27,7 +28,8 @@ impl TemporaryLockfile {
         if !required {
             return Ok(None);
         }
-        let root = workspace_root(project)?;
+        let toolchain = build_toolchain(project)?;
+        let root = workspace_root(project, &toolchain)?;
         let path = root.join("Cargo.lock");
         if path.exists() {
             return Ok(None);
@@ -54,6 +56,7 @@ impl TemporaryLockfile {
                 .join("Cargo.toml")
         };
         let output = Command::new("cargo")
+            .env("RUSTUP_TOOLCHAIN", toolchain)
             .args(["generate-lockfile", "--manifest-path", manifest.as_str()])
             .current_dir(root.as_std_path())
             .output()

@@ -15,6 +15,7 @@ use camino::Utf8PathBuf;
 use cargo_metadata::Metadata;
 use cargo_metadata::MetadataCommand;
 use cargo_metadata::Package;
+use serde::Deserialize;
 use serde::Serialize;
 
 use crate::PolicyError;
@@ -43,13 +44,50 @@ pub struct ResolvedPackage {
     pub source: Option<String>,
 }
 
+#[derive(Deserialize)]
+struct ToolDefaults {
+    build_toolchain: String,
+}
+
+/// Selects the project build toolchain for Cargo subprocesses.
+///
+/// # Errors
+///
+/// Returns a configuration error with the selected path when the defaults
+/// file is missing, unreadable, invalid, or has no nonempty build toolchain.
+pub(crate) fn build_toolchain(project: &Utf8Path) -> Result<String, PolicyError> {
+    let new_path = project.join(".infra/tools/defaults.toml");
+    let old_path = project.join(".infra/ci/defaults.toml");
+    let path = match std::fs::symlink_metadata(new_path.as_std_path()) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound && old_path.exists() => old_path,
+        _ => new_path,
+    };
+    let source = std::fs::read_to_string(path.as_std_path()).map_err(|source| PolicyError::ReadConfig {
+        path: path.to_string(),
+        source,
+    })?;
+    let defaults: ToolDefaults = toml::from_str(&source).map_err(|source| PolicyError::ParseConfig {
+        path: path.to_string(),
+        source,
+    })?;
+    if defaults.build_toolchain.trim().is_empty() {
+        return Err(PolicyError::InvalidConfig {
+            code: "DP001",
+            message: format!("build_toolchain must not be empty in {path}"),
+        });
+    }
+    Ok(defaults.build_toolchain)
+}
+
 /// Loads root-package Cargo metadata without resolving or updating
 /// dependencies.
 pub(crate) fn load_metadata(project: &Utf8Path) -> Result<(Metadata, Option<Package>), PolicyError> {
+    let toolchain = build_toolchain(project)?;
     let manifest = project.join("Cargo.toml");
     let mut command = MetadataCommand::new();
     command.manifest_path(manifest.as_std_path());
     command.no_deps();
+    command.env("RUSTUP_TOOLCHAIN", toolchain);
     let metadata = command.exec().map_err(|error| PolicyError::Cargo {
         code: "DP201",
         message: error.to_string(),
@@ -59,9 +97,10 @@ pub(crate) fn load_metadata(project: &Utf8Path) -> Result<(Metadata, Option<Pack
 }
 
 /// Returns the Cargo workspace root without resolving dependencies.
-pub(crate) fn workspace_root(project: &Utf8Path) -> Result<Utf8PathBuf, PolicyError> {
+pub(crate) fn workspace_root(project: &Utf8Path, toolchain: &str) -> Result<Utf8PathBuf, PolicyError> {
     let manifest = project.join("Cargo.toml");
     let output = Command::new("cargo")
+        .env("RUSTUP_TOOLCHAIN", toolchain)
         .args([
             "locate-project",
             "--workspace",
@@ -97,10 +136,12 @@ pub(crate) fn workspace_root(project: &Utf8Path) -> Result<Utf8PathBuf, PolicyEr
 
 /// Loads the complete resolved graph while refusing to change Cargo.lock.
 pub(crate) fn load_locked_metadata(project: &Utf8Path) -> Result<Metadata, PolicyError> {
+    let toolchain = build_toolchain(project)?;
     let manifest = project.join("Cargo.toml");
     let mut command = MetadataCommand::new();
     command.manifest_path(manifest.as_std_path());
     command.other_options(vec!["--locked".into(), "--all-features".into()]);
+    command.env("RUSTUP_TOOLCHAIN", toolchain);
     command.exec().map_err(|error| PolicyError::Cargo {
         code: "DP404",
         message: format!("locked Cargo metadata failed: {error}"),
