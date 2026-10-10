@@ -149,6 +149,11 @@ fn test_cli_generates_and_removes_a_temporary_lockfile() {
 fn test_cli_uses_new_defaults_for_every_temporary_lockfile_cargo_command() {
     let temporary = project_fixture();
     let project = temporary.path();
+    std::fs::write(
+        project.join("Cargo.toml"),
+        "[package]\nname = \"temporary-lockfile-toolchain-fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    )
+    .expect("dependency-free manifest");
     write_defaults(project, ".infra/tools/defaults.toml", "1.94.0");
     write_defaults(project, ".infra/ci/defaults.toml", "unused-old-toolchain");
     let (mut command, trace) = command_with_fake_cargo(&temporary);
