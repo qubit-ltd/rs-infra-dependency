@@ -56,12 +56,7 @@ struct ToolDefaults {
 /// Returns a configuration error with the selected path when the defaults
 /// file is missing, unreadable, invalid, or has no nonempty build toolchain.
 pub(crate) fn build_toolchain(project: &Utf8Path) -> Result<String, PolicyError> {
-    let new_path = project.join(".infra/tools/defaults.toml");
-    let old_path = project.join(".infra/ci/defaults.toml");
-    let path = match std::fs::symlink_metadata(new_path.as_std_path()) {
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound && old_path.exists() => old_path,
-        _ => new_path,
-    };
+    let path = project.join(".infra/tools/defaults.toml");
     let source = std::fs::read_to_string(path.as_std_path()).map_err(|source| PolicyError::ReadConfig {
         path: path.to_string(),
         source,

@@ -148,7 +148,7 @@ fn test_cli_uses_new_defaults_for_every_temporary_lockfile_cargo_command() {
 
 #[cfg(unix)]
 #[test]
-fn test_inventory_uses_legacy_defaults_when_new_file_is_absent() {
+fn test_inventory_rejects_legacy_defaults_when_new_file_is_absent() {
     let temporary = project_fixture();
     let project = temporary.path();
     write_defaults(project, ".infra/ci/defaults.toml", "1.94.0");
@@ -157,10 +157,13 @@ fn test_inventory_uses_legacy_defaults_when_new_file_is_absent() {
         .args(["inventory", "--root", project.to_str().expect("UTF-8 project")])
         .output()
         .expect("run inventory");
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    let entries = std::fs::read_to_string(trace).expect("Cargo trace");
-    assert_eq!(entries.lines().count(), 1, "{entries}");
-    assert!(entries.starts_with("1.94.0|metadata"), "{entries}");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains(&project.join(".infra/tools/defaults.toml").display().to_string()),
+        "{stderr}"
+    );
+    assert!(!trace.exists(), "Cargo ran before required defaults were loaded");
 }
 
 #[test]
