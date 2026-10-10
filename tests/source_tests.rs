@@ -142,6 +142,7 @@ fn create_remote() -> (TempDir, Utf8PathBuf, String) {
     let revision = run_git(&worktree, &["rev-parse", "HEAD"]);
     run_git(&worktree, &["remote", "add", "origin", remote.as_str()]);
     run_git(&worktree, &["push", "origin", "main"]);
+    run_git(&remote, &["symbolic-ref", "HEAD", "refs/heads/main"]);
 
     std::fs::write(
         worktree.join("policy/baselines/v2026.09.0.txt").as_std_path(),
