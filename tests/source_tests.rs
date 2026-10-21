@@ -49,7 +49,10 @@ fn test_project_baseline_uses_installed_current_policy() {
 
     let loaded = load_project_baseline(project).expect("installed project baseline");
     assert_eq!(loaded.release, "v2026.10.06.1");
-    assert!(loaded.commit.starts_with("sha256:"));
+    assert_eq!(
+        loaded.commit,
+        "sha256:2d5c9d286d4e5d03202e7d3f3440aef704517c60371953a027d95dfd44e67c23"
+    );
     assert_eq!(
         loaded
             .baseline

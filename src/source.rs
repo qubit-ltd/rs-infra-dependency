@@ -9,6 +9,7 @@
 //! Local and Git baseline source resolution.
 
 use std::collections::hash_map::DefaultHasher;
+use std::fmt::Write as _;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::process::Command;
@@ -121,8 +122,13 @@ pub fn load_project_baseline(project: &Utf8Path) -> Result<LoadedBaseline, Polic
         Baseline::parse(text)?
     };
     let digest = Sha256::digest(text.replace("\r\n", "\n").as_bytes());
+    let mut commit = String::with_capacity(71);
+    commit.push_str("sha256:");
+    for byte in digest {
+        write!(&mut commit, "{byte:02x}").expect("writing to String cannot fail");
+    }
     Ok(LoadedBaseline {
-        commit: format!("sha256:{digest:x}"),
+        commit,
         release: current.baseline,
         baseline,
     })
