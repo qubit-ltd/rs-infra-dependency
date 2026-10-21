@@ -215,10 +215,7 @@ impl Cli {
                     Ok(())
                 } else {
                     for violation in &evaluation.violations {
-                        eprintln!(
-                            "[{}] {}: {}",
-                            violation.code, violation.crate_name, violation.message
-                        );
+                        eprintln!("[{}] {}: {}", violation.code, violation.crate_name, violation.message);
                     }
                     Err(PolicyError::PolicyViolation {
                         count: evaluation.violations.len(),
