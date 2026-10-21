@@ -16,6 +16,7 @@ usage() {
   --release <版本>   baseline release，默认当前日期 vYYYY.MM.DD
   --output <文件>    输出 baseline 文件（.toml 生成 format=3）
   --internal-prefix <前缀>  声明内部 crate 命名空间前缀（可重复；默认不排除任何 registry crate）
+  版本冲突时输入 c 可自定义 Cargo 版本要求
   --help             显示帮助
 
 脚本会逐项询问冲突依赖选择，生成可直接接入的 baseline，不修改业务仓库。
@@ -65,7 +66,30 @@ roots=("${valid_roots[@]}")
 
 inventory=$(mktemp)
 rules=$(mktemp)
-trap 'rm -f "$inventory" "$rules"' EXIT
+validation_root=$(mktemp -d)
+trap 'rm -f "$inventory" "$rules"; rm -rf -- "$validation_root"' EXIT
+
+valid_requirement() {
+    local crate="$1" requirement="$2"
+    [[ -n "$requirement" && "$requirement" != *$'\n'* && "$requirement" != *$'\r'* && "$requirement" != *$'\t'* ]] || return 1
+    local requirement_pattern='^[[:alnum:].,*+<=>^~_ -]+$'
+    [[ "$requirement" =~ $requirement_pattern ]] || return 1
+    : >"$validation_root/lib.rs"
+    cat >"$validation_root/Cargo.toml" <<EOF
+[package]
+name = "baseline-requirement-validation"
+version = "0.0.0"
+edition = "2024"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+${crate} = "${requirement}"
+EOF
+    cargo metadata --manifest-path "$validation_root/Cargo.toml" --format-version 1 --no-deps >/dev/null 2>&1
+}
+
 args=(run --quiet --bin rs-infra-dependency -- inventory)
 for root in "${roots[@]}"; do args+=(--root "$root"); done
 args+=(--format json --output "$inventory")
@@ -83,14 +107,29 @@ while IFS= read -r name; do
         if ((${#choices[@]} > 1)); then
             printf '\n依赖 %s 存在多个声明版本：\n' "$name" >&2
             for i in "${!choices[@]}"; do printf '  %d) %s\n' "$((i + 1))" "${choices[$i]}" >&2; done
+            printf '  c) 自定义 Cargo 版本要求\n' >&2
             [[ -r /dev/tty ]] || { printf '无法访问交互终端，请在终端运行后选择版本。\n' >&2; exit 2; }
             while true; do
-                if ! read -r -p "选择 [1-${#choices[@]}]（默认 1，输入 q 放弃）：" answer </dev/tty; then
+                if ! read -r -p "选择 [1-${#choices[@]}] 或 c（默认 1，输入 q 放弃）：" answer </dev/tty; then
                     printf '\n未检测到交互输入；请在终端运行并选择版本，未生成 baseline。\n' >&2
                     exit 2
                 fi
                 answer=${answer:-1}
                 [[ "$answer" == q ]] && { printf '用户取消，未写入 baseline。\n' >&2; exit 1; }
+                if [[ "$answer" == c ]]; then
+                    while true; do
+                        if ! read -r -p "请输入 ${name} 的 Cargo 版本要求：" custom_requirement </dev/tty; then
+                            printf '\n未检测到交互输入；请在终端运行并输入版本要求，未生成 baseline。\n' >&2
+                            exit 2
+                        fi
+                        if valid_requirement "$name" "$custom_requirement"; then
+                            selected="$custom_requirement"
+                            break
+                        fi
+                        printf '无效的 Cargo 版本要求，请重新输入（例如 ^1.2 或 >=1.2, <2）。\n' >&2
+                    done
+                    break
+                fi
                 [[ "$answer" =~ ^[0-9]+$ && "$answer" -ge 1 && "$answer" -le "${#choices[@]}" ]] && { selected="${choices[$((answer - 1))]}"; break; }
                 printf '请输入有效编号。\n' >&2
             done
