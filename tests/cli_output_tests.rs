@@ -334,7 +334,12 @@ fn test_check_returns_a_policy_violation_for_a_requirement_drift() {
         .output()
         .expect("run check");
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("policy violation(s) found"));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("[DP200] 1 policy violation(s) found"), "{stderr}");
+    assert!(
+        stderr.contains("[DP202] num-bigint: declared requirement ^0.5 differs from baseline ^0.4"),
+        "{stderr}"
+    );
 }
 
 #[test]
