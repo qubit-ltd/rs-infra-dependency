@@ -44,7 +44,7 @@ num-bigint ^0.4
 num-rational ^0.4
 num-traits ^0.2
 oneshot ^0.2
-ort ">=2.0.0-rc.12, <2.1" 
+ort >=2.0.0-rc.12,<2.1
 parking_lot ^0.12
 parse-display ^0.11
 percent-encoding ^2.3

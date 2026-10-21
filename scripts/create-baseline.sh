@@ -165,6 +165,11 @@ else
     {
         printf '# package requirement\n'
         while IFS=$'\t' read -r name selected; do
+            # The text format stores each requirement as one token. Cargo
+            # accepts comparator lists without spaces after commas.
+            selected=${selected//, /,}
+            selected=${selected#\"}
+            selected=${selected%\"}
             printf '%s %s\n' "$name" "$selected"
         done <"$rules"
     } >"$output"
