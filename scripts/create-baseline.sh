@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-repo_dir=$(cd -- "${script_dir}/.." && pwd)
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+repo_dir=$(cd -- "${script_dir}/.." && pwd -P)
 release="v$(date +%Y.%m.%d)"
-output="${repo_dir}/conf/policy/baselines/${release}.txt"
+output=""
 roots=()
 internal_prefixes=()
 
@@ -33,6 +33,14 @@ while (($# > 0)); do
         *) printf '未知参数：%s\n' "$1" >&2; usage >&2; exit 2 ;;
     esac
 done
+
+[[ "$release" =~ ^[[:alnum:]][[:alnum:]._-]*$ ]] || {
+    printf '无效的 baseline release：%s\n' "$release" >&2
+    exit 2
+}
+default_output="${repo_dir}/conf/policy/baselines/${release}.txt"
+[[ -n "$output" ]] || output="$default_output"
+if [[ "$output" != /* ]]; then output="$(pwd -P)/$output"; fi
 
 ((${#roots[@]} > 0)) || { printf '至少需要一个 --root。\n' >&2; usage >&2; exit 2; }
 command -v jq >/dev/null || { printf '需要 jq 才能交互选择依赖版本。\n' >&2; exit 2; }
@@ -67,7 +75,15 @@ roots=("${valid_roots[@]}")
 inventory=$(mktemp)
 rules=$(mktemp)
 validation_root=$(mktemp -d)
-trap 'rm -f "$inventory" "$rules"; rm -rf -- "$validation_root"' EXIT
+current_tmp=""
+manifest_tmp=""
+cleanup() {
+    rm -f -- "$inventory" "$rules"
+    rm -rf -- "$validation_root"
+    [[ -z "$current_tmp" ]] || rm -f -- "$current_tmp"
+    [[ -z "$manifest_tmp" ]] || rm -f -- "$manifest_tmp"
+}
+trap cleanup EXIT
 
 valid_requirement() {
     local crate="$1" requirement="$2"
@@ -155,4 +171,36 @@ else
 fi
 
 printf 'baseline 已生成：%s\n' "$output"
-printf '请审查基线，并更新 conf/policy/current.toml 和 conf/manifest.json 中的当前版本。\n'
+baseline_dir="${repo_dir}/conf/policy/baselines"
+manifest_source=""
+if [[ "$output" == "${baseline_dir}/${release}.txt" ]]; then
+    manifest_source="policy/baselines/${release}.txt"
+elif [[ "$output" == "${baseline_dir}/${release}.toml" ]]; then
+    manifest_source="policy/baselines/${release}.toml"
+fi
+
+if [[ -n "$manifest_source" ]]; then
+    current_path="${repo_dir}/conf/policy/current.toml"
+    manifest_path="${repo_dir}/conf/manifest.json"
+    [[ -f "$current_path" && -f "$manifest_path" ]] || {
+        printf '错误：缺少 current.toml 或 conf/manifest.json，未更新基线指针。\n' >&2
+        exit 1
+    }
+    current_tmp=$(mktemp "${current_path}.XXXXXX")
+    manifest_tmp=$(mktemp "${manifest_path}.XXXXXX")
+    printf 'baseline = "%s"\n' "$release" >"$current_tmp"
+    jq --arg source "$manifest_source" --arg target "$manifest_source" \
+        'if any(.files[]; .source == $source) then
+            .files |= map(if .source == $source then .target = $target else . end)
+         else
+            .files += [{"source": $source, "target": $target}]
+         end' \
+        "$manifest_path" >"$manifest_tmp"
+    mv -- "$current_tmp" "$current_path"
+    current_tmp=""
+    mv -- "$manifest_tmp" "$manifest_path"
+    manifest_tmp=""
+    printf '已将当前基线更新为 %s，并登记到 conf/manifest.json。\n' "$release"
+else
+    printf '自定义输出路径不在标准 baseline 目录，未更新 current.toml 和 conf/manifest.json。\n'
+fi
