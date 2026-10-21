@@ -60,3 +60,32 @@ PATH="${test_dir}/bin:$PATH" "${repo_dir}/scripts/create-baseline.sh" \
   --release vtest \
   --output "$toml_output"
 rg -F 'ort = ">=2.0.0-rc.12,<2.1"' "$toml_output"
+
+conflict_fixture="${test_dir}/conflict-fixture"
+mkdir -p "${conflict_fixture}/.infra/tools"
+cp "${repo_dir}/tests/fixtures/num-bigint-04/.infra/tools/defaults.toml" "${conflict_fixture}/.infra/tools/defaults.toml"
+cat >"${conflict_fixture}/Cargo.toml" <<'EOF'
+[package]
+name = "baseline-conflict-test"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "src.rs"
+
+[dependencies]
+clap = "4"
+
+[dev-dependencies]
+clap = "^4.5"
+
+[build-dependencies]
+clap = "^4.4"
+EOF
+printf '' >"${conflict_fixture}/src.rs"
+conflict_output="${test_dir}/conflict.txt"
+PATH="${test_dir}/bin:$PATH" "${repo_dir}/scripts/create-baseline.sh" \
+  --root "$conflict_fixture" \
+  --release vtest \
+  --output "$conflict_output"
+rg -x 'clap \^4\.5' "$conflict_output"

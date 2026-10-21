@@ -147,6 +147,31 @@ while IFS= read -r name; do
         mapfile -t choices < <(jq -r --arg n "$name" '.direct_requirements[$n][]' "$inventory")
         selected="${choices[0]}"
         if ((${#choices[@]} > 1)); then
+            same_major=1
+            major=""
+            highest_minor=-1
+            for choice in "${choices[@]}"; do
+                if [[ ! "$choice" =~ ^[=^]?([0-9]+)(\.([0-9]+)(\.[0-9]+)?)?$ ]]; then
+                    same_major=0
+                    break
+                fi
+                choice_major="${BASH_REMATCH[1]}"
+                if [[ -n "$major" && "$choice_major" != "$major" ]]; then
+                    same_major=0
+                    break
+                fi
+                major="$choice_major"
+                choice_minor=-1
+                if [[ -n "${BASH_REMATCH[3]:-}" ]]; then
+                    choice_minor=$((10#${BASH_REMATCH[3]}))
+                fi
+                if ((choice_minor > highest_minor)); then
+                    highest_minor=$choice_minor
+                    selected="$choice"
+                fi
+            done
+        fi
+        if ((${#choices[@]} > 1 && !same_major)); then
             printf '\n依赖 %s 存在多个声明版本：\n' "$name" >&2
             for i in "${!choices[@]}"; do printf '  %d) %s\n' "$((i + 1))" "${choices[$i]}" >&2; done
             printf '  c) 自定义 Cargo 版本要求\n' >&2

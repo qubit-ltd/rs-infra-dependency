@@ -43,8 +43,9 @@ Run the interactive generator in this repository:
 
 Each `--root` is either a Rust project or a parent containing Rust projects one
 level below. The generator ignores `path` and `workspace` dependencies, and
-uses caller-supplied prefixes for published first-party crates. For each
-conflicting external dependency, it asks once which Cargo requirement to use.
+uses caller-supplied prefixes for published first-party crates. When stable
+requirements share a major version, it selects the highest declared minor
+automatically (`^4` and `^4.5` become `^4.5`). Other conflicts require a choice.
 Simple stable requirements are written as `^major.minor`; a major-only
 requirement uses the highest published minor in that major line. A prerelease
 such as `=2.0.0-rc.12` becomes `>=2.0.0-rc.12,<2.1`.
