@@ -106,6 +106,32 @@ EOF
     cargo metadata --manifest-path "$validation_root/Cargo.toml" --format-version 1 --no-deps >/dev/null 2>&1
 }
 
+normalize_requirement() {
+    local crate="$1" requirement="$2" major info
+    if [[ "$requirement" =~ ^[=^]?([0-9]+)\.([0-9]+)\.([0-9]+)-([0-9A-Za-z.-]+)$ ]]; then
+        printf '>=%s.%s.%s-%s,<%s.%s\n' \
+            "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}" \
+            "${BASH_REMATCH[1]}" "$((10#${BASH_REMATCH[2]} + 1))"
+    elif [[ "$requirement" =~ ^[=^]?([0-9]+)\.([0-9]+)(\.[0-9]+)?$ ]]; then
+        printf '^%s.%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+    elif [[ "$requirement" =~ ^\^?([0-9]+)$ ]]; then
+        major="${BASH_REMATCH[1]}"
+        if ! info=$(cargo info "${crate}@${major}" --quiet); then
+            printf '无法查询 %s 的 %s.x 已发布版本。\n' "$crate" "$major" >&2
+            return 1
+        fi
+        if [[ "$info" =~ (^|$'\n')version:[[:space:]]([0-9]+)\.([0-9]+)\.[0-9]+([[:space:]]|$) ]] \
+            && [[ "${BASH_REMATCH[2]}" == "$major" ]]; then
+            printf '^%s.%s\n' "$major" "${BASH_REMATCH[3]}"
+        else
+            printf '未找到 %s 的 %s.x 稳定已发布版本。\n' "$crate" "$major" >&2
+            return 1
+        fi
+    else
+        printf '%s\n' "$requirement"
+    fi
+}
+
 args=(run --quiet --bin rs-infra-dependency -- inventory)
 for root in "${roots[@]}"; do args+=(--root "$root"); done
 args+=(--format json --output "$inventory")
@@ -150,6 +176,7 @@ while IFS= read -r name; do
                 printf '请输入有效编号。\n' >&2
             done
         fi
+        selected=$(normalize_requirement "$name" "$selected")
         printf '%s\t%s\n' "$name" "$selected" >>"$rules"
 done < <(jq -r '.direct_requirements | keys[]' "$inventory")
 
