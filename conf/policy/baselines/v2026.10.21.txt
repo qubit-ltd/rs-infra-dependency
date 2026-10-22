@@ -40,7 +40,9 @@ hyper ^1.12
 hyper-util ^0.1
 indexmap ^2.14
 inventory ^0.3
+leb128 ^0.2
 libc ^0.2
+libfuzzer-sys ^0.4
 log ^0.4
 loom ^0.7
 magika ^1.1
@@ -48,6 +50,7 @@ matchit ^0.8
 num-bigint ^0.4
 num-rational ^0.4
 num-traits ^0.2
+object_store ^0.14
 oneshot ^0.2
 ort >=2.0.0-rc.12,<2.1
 parking_lot ^0.12
