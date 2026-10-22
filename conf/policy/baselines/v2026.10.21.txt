@@ -18,6 +18,7 @@ crossbeam-channel ^0.5
 crossbeam-deque ^0.8
 crossbeam-queue ^0.3
 csv ^1.4
+digest ^0.11
 dotenvy ^0.15
 fastrand ^2.5
 flate2 ^1.1
