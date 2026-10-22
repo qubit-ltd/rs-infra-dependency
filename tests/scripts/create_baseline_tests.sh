@@ -39,6 +39,23 @@ fi
 EOF
 chmod +x "${test_dir}/bin/cargo"
 
+mkdir -p "${fixture}/fuzz"
+cat >"${fixture}/fuzz/Cargo.toml" <<'EOF'
+[package]
+name = "baseline-nested-fuzz"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[lib]
+path = "src.rs"
+
+[dependencies]
+serde_json = "^1.0"
+EOF
+printf '' >"${fixture}/fuzz/src.rs"
+
 PATH="${test_dir}/bin:$PATH" "${repo_dir}/scripts/create-baseline.sh" \
   --root "$fixture" \
   --release vtest \
@@ -48,6 +65,7 @@ rg -x 'num-bigint \^0\.4' "$output"
 rg -x 'clap \^2\.10' "$output"
 rg -x 'ort >=2\.0\.0-rc\.12,<2\.1' "$output"
 rg -x 'syn \^2\.0' "$output"
+rg -x 'serde_json \^1\.0' "$output"
 rg -x 'quote \^1\.0' "$output"
 if rg -F '[profiles.' "$output"; then
     printf 'baseline 不应包含 profile 表。\n' >&2

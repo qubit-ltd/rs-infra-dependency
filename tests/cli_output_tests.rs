@@ -273,6 +273,38 @@ fn test_cli_reports_json_and_applies_sync_plan() {
 }
 
 #[test]
+fn test_recursive_check_and_sync_include_nested_crates() {
+    let temporary = project_fixture();
+    let project = temporary.path();
+    write_defaults(project, ".infra/tools/defaults.toml", "1.94.0");
+    std::fs::write(
+        project.join(".infra/dependency/policy/baselines/v2026.09.2.toml"),
+        "format = 3\n[direct]\nnum-bigint = \"^0.4\"\n[resolved]\n",
+    )
+    .expect("baseline without resolved rules");
+    std::fs::create_dir_all(project.join("fuzz/src")).expect("nested crate");
+    std::fs::write(project.join("fuzz/src/lib.rs"), "").expect("nested source");
+    let nested_manifest = project.join("fuzz/Cargo.toml");
+    std::fs::write(
+        &nested_manifest,
+        "[package]\nname = \"nested-fuzz\"\nversion = \"0.1.0\"\nedition = \"2021\"\n[dependencies]\nnum-bigint = \"0.5\"\n",
+    )
+    .expect("nested manifest");
+    let check = binary()
+        .args(["--project", project.to_str().expect("UTF-8 project"), "--recursive", "check"])
+        .output()
+        .expect("recursive check");
+    assert!(!check.status.success());
+    assert!(String::from_utf8_lossy(&check.stderr).contains("num-bigint"));
+    let sync = binary()
+        .args(["--project", project.to_str().expect("UTF-8 project"), "--recursive", "sync"])
+        .output()
+        .expect("recursive sync");
+    assert!(sync.status.success(), "{}", String::from_utf8_lossy(&sync.stderr));
+    assert!(std::fs::read_to_string(&nested_manifest).expect("updated nested manifest").contains("num-bigint = \"^0.4\""));
+}
+
+#[test]
 fn test_inventory_writes_json_to_a_file_and_reports_write_errors() {
     let temporary = project_fixture();
     let project = temporary.path();

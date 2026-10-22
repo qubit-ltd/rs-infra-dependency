@@ -41,8 +41,9 @@ Run the interactive generator in this repository:
   --release v2026.09.13
 ```
 
-Each `--root` is either a Rust project or a parent containing Rust projects one
-level below. The generator ignores `path` and `workspace` dependencies, and
+Each `--root` is either a Rust project or a parent containing Rust projects.
+The generator scans nested Cargo manifests recursively, skipping hidden directories,
+`target`, and `tests/fixtures`. It ignores `path` and `workspace` dependencies, and
 uses caller-supplied prefixes for published first-party crates. When stable
 requirements share a major version, it selects the highest declared minor
 automatically (`^4` and `^4.5` become `^4.5`). Other conflicts require a choice.
@@ -107,9 +108,9 @@ baseline by release and content digest.
 Check and synchronize a project:
 
 ```bash
-rs-infra-dependency --project . check
-rs-infra-dependency --project . sync --dry-run
-rs-infra-dependency --project . sync
+rs-infra-dependency --project . --recursive check
+rs-infra-dependency --project . --recursive sync --dry-run
+rs-infra-dependency --project . --recursive sync
 ```
 
 `check` rejects an external direct dependency missing from the baseline (`DP203`)
@@ -123,7 +124,7 @@ changed by the checker. Library projects without a lock file use the reusable
 Action's temporary lock-file mode; local checks can opt in explicitly:
 
 ```bash
-rs-infra-dependency --project . check --temporary-lockfile
+rs-infra-dependency --project . --recursive check --temporary-lockfile
 ```
 
 The temporary `Cargo.lock` is generated at the workspace root and removed after

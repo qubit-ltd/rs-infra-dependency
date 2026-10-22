@@ -70,6 +70,7 @@ pub fn run_cli(mut arguments: Vec<std::ffi::OsString>) {
 /// let cli = Cli {
 ///     project: Utf8PathBuf::from("."),
 ///     config: None,
+///     recursive: false,
 ///     temporary_lockfile: false,
 ///     command: Command::Check,
 /// };
@@ -84,6 +85,9 @@ pub struct Cli {
     /// Explicit project configuration path.
     #[arg(long)]
     pub config: Option<Utf8PathBuf>,
+    /// Include Cargo manifests in nested crates for check and sync.
+    #[arg(long, global = true)]
+    pub recursive: bool,
     /// Generate and remove a lock file when resolved rules need one.
     #[arg(long, global = true)]
     pub temporary_lockfile: bool,
@@ -206,23 +210,36 @@ impl Cli {
         let baseline = load_project_baseline(&self.project)?;
         let needs_lock =
             baseline.baseline.has_resolved_rules() && matches!(self.command, Command::Check | Command::Report { .. });
-        let temporary_lockfile = TemporaryLockfile::prepare(&self.project, needs_lock, self.temporary_lockfile)?;
+        let projects = if self.recursive && matches!(self.command, Command::Check | Command::Sync { .. }) {
+            discover_projects(&self.project)?
+        } else {
+            vec![self.project.clone()]
+        };
         let result = match &self.command {
             Command::Inventory { .. } => unreachable!("inventory handled before baseline loading"),
             Command::Check => {
-                let evaluation = evaluate(&self.project, &config, &baseline)?;
-                if evaluation.violations.is_empty() {
+                let mut violations = 0;
+                for project in &projects {
+                    let temporary_lockfile =
+                        TemporaryLockfile::prepare(project, needs_lock, self.temporary_lockfile)?;
+                    let evaluation = evaluate(project, &config, &baseline)?;
+                    for violation in &evaluation.violations {
+                        eprintln!("{}: [{}] {}: {}", project, violation.code, violation.crate_name, violation.message);
+                    }
+                    violations += evaluation.violations.len();
+                    if let Some(lockfile) = temporary_lockfile {
+                        lockfile.cleanup()?;
+                    }
+                }
+                if violations == 0 {
                     Ok(())
                 } else {
-                    for violation in &evaluation.violations {
-                        eprintln!("[{}] {}: {}", violation.code, violation.crate_name, violation.message);
-                    }
-                    Err(PolicyError::PolicyViolation {
-                        count: evaluation.violations.len(),
-                    })
+                    Err(PolicyError::PolicyViolation { count: violations })
                 }
             }
             Command::Report { format } => {
+                let temporary_lockfile =
+                    TemporaryLockfile::prepare(&self.project, needs_lock, self.temporary_lockfile)?;
                 let evaluation = evaluate(&self.project, &config, &baseline)?;
                 let report = Report::from_evaluation(evaluation, &baseline);
                 let text = match format {
@@ -230,21 +247,70 @@ impl Cli {
                     ReportFormat::Markdown => render_markdown(&report),
                 };
                 println!("{text}");
+                if let Some(lockfile) = temporary_lockfile {
+                    lockfile.cleanup()?;
+                }
                 Ok(())
             }
             Command::Sync { dry_run } => {
-                let plan = plan_sync(&self.project, &baseline.baseline)?;
+                let mut plan = crate::SyncPlan {
+                    manifest_edits: Vec::new(),
+                    lock_updates: Vec::new(),
+                    blocked: Vec::new(),
+                };
+                for project in &projects {
+                    let next = plan_sync(project, &baseline.baseline)?;
+                    plan.manifest_edits.extend(next.manifest_edits);
+                    plan.lock_updates.extend(next.lock_updates);
+                    plan.blocked.extend(next.blocked);
+                }
                 for edit in &plan.manifest_edits {
-                    println!("{}: {} -> {}", edit.dependency, edit.old, edit.new);
+                    println!("{}: {}: {} -> {}", edit.path, edit.dependency, edit.old, edit.new);
                 }
                 if *dry_run { Ok(()) } else { apply_sync(&plan) }
             }
         };
-        if let Some(lockfile) = temporary_lockfile
-            && result.is_ok()
-        {
-            lockfile.cleanup()?;
-        }
         result
     }
+}
+
+fn discover_projects(root: &camino::Utf8Path) -> Result<Vec<Utf8PathBuf>, PolicyError> {
+    let mut projects = vec![root.to_owned()];
+    let mut pending = vec![root.to_owned()];
+    while let Some(directory) = pending.pop() {
+        let entries = std::fs::read_dir(directory.as_std_path()).map_err(|source| PolicyError::ReadConfig {
+            path: directory.to_string(),
+            source,
+        })?;
+        for entry in entries {
+            let entry = entry.map_err(|source| PolicyError::ReadConfig {
+                path: directory.to_string(),
+                source,
+            })?;
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name.starts_with('.')
+                || name == "target"
+                || (name == "fixtures" && directory.file_name() == Some("tests"))
+            {
+                continue;
+            }
+            let file_type = entry.file_type().map_err(|source| PolicyError::ReadConfig {
+                path: entry.path().display().to_string(),
+                source,
+            })?;
+            if !file_type.is_dir() {
+                continue;
+            }
+            let path = Utf8PathBuf::from_path_buf(entry.path()).map_err(|path| PolicyError::Sync {
+                message: format!("nested crate path is not UTF-8: {}", path.display()),
+            })?;
+            if path.join("Cargo.toml").is_file() {
+                projects.push(path.clone());
+            }
+            pending.push(path);
+        }
+    }
+    projects[1..].sort();
+    Ok(projects)
 }

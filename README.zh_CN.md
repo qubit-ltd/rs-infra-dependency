@@ -34,7 +34,7 @@ cargo install --path .
   --release v2026.09.13
 ```
 
-每个 `--root` 可以是 Rust 项目，也可以是其父目录；父目录会扫描一级子目录。脚本自动排除 `path`、`workspace` 依赖；已发布但仍属内部生态的 crate 通过调用方传入的 `--internal-prefix` 识别。同一依赖的稳定版本声明若属于同一个 major，脚本自动选最高的已声明 minor（例如 `^4` 和 `^4.5` 选 `^4.5`）；其他冲突才询问。普通稳定版本统一写成 `^major.minor`；只有 major 的声明会查询该主版本已发布的最高 minor。预发布版本（如 `=2.0.0-rc.12`）写成 `>=2.0.0-rc.12,<2.1`。
+每个 `--root` 可以是 Rust 项目，也可以是其父目录；脚本会递归扫描子目录中的 Cargo 清单，跳过隐藏目录、`target` 和 `tests/fixtures`。脚本自动排除 `path`、`workspace` 依赖；已发布但仍属内部生态的 crate 通过调用方传入的 `--internal-prefix` 识别。同一依赖的稳定版本声明若属于同一个 major，脚本自动选最高的已声明 minor（例如 `^4` 和 `^4.5` 选 `^4.5`）；其他冲突才询问。普通稳定版本统一写成 `^major.minor`；只有 major 的声明会查询该主版本已发布的最高 minor。预发布版本（如 `=2.0.0-rc.12`）写成 `>=2.0.0-rc.12,<2.1`。
 
 结果默认写为可用且排序稳定的 `conf/policy/baselines/<release>.txt`；输出文件名使用 `.toml` 时生成新格式：
 
@@ -84,9 +84,9 @@ internal-prefixes = ["qubit-"]
 检查和同步单个项目：
 
 ```bash
-rs-infra-dependency --project . check
-rs-infra-dependency --project . sync --dry-run
-rs-infra-dependency --project . sync
+rs-infra-dependency --project . --recursive check
+rs-infra-dependency --project . --recursive sync --dry-run
+rs-infra-dependency --project . --recursive sync
 ```
 
 若外部直接依赖未登记到基线，`check` 返回 `DP203`；若版本要求不同，则返回 `DP202`。`sync` 可以同步标准 `[dependencies]`、`[dev-dependencies]` 与 `[build-dependencies]`，并保留 inline table 中的 feature；它不会改动 path/workspace 依赖。
@@ -96,7 +96,7 @@ rs-infra-dependency --project . sync
 `Cargo.lock`。没有锁文件的库项目由 GitHub Action 自动生成临时锁文件；本地可以显式运行：
 
 ```bash
-rs-infra-dependency --project . check --temporary-lockfile
+rs-infra-dependency --project . --recursive check --temporary-lockfile
 ```
 
 临时 `Cargo.lock` 位于 workspace 根目录，检查结束后会删除。解析规则是最低版本要求，例如 `rustls >=0.23.45`；所有匹配版本都必须满足要求，未使用 `rustls` 的项目不受影响。

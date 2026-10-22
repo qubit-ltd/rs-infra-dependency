@@ -47,17 +47,14 @@ command -v jq >/dev/null || { printf '需要 jq 才能交互选择依赖版本�
 
 expanded=()
 for root in "${roots[@]}"; do
-    if [[ -f "${root}/Cargo.toml" ]]; then
-        expanded+=("$root")
-        continue
-    fi
-    found=0
-    for manifest in "$root"/*/Cargo.toml; do
-        [[ -f "$manifest" ]] || continue
+    mapfile -d '' -t manifests < <(
+        find "$root" -mindepth 1 -type d \( -name '.*' -o -name target -o -path '*/tests/fixtures' \) -prune -o \
+            -type f -name Cargo.toml -print0 | sort -z
+    )
+    ((${#manifests[@]} > 0)) || { printf '未找到 Rust 项目：%s\n' "$root" >&2; exit 2; }
+    for manifest in "${manifests[@]}"; do
         expanded+=("${manifest%/Cargo.toml}")
-        found=1
     done
-    ((found)) || { printf '不是 Rust 项目目录或一级父目录：%s\n' "$root" >&2; exit 2; }
 done
 roots=("${expanded[@]}")
 
