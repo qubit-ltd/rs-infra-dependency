@@ -91,7 +91,7 @@ tar ^0.4
 tempfile ^3.27
 thiserror ^2.0
 threadpool ^1.8
-tokio ^1.53
+tokio ^1.54
 tokio-rustls ^0.26
 tokio-tungstenite ^0.30
 tokio-util ^0.7
