@@ -55,6 +55,31 @@ fn plans_and_applies_string_and_inline_dependency_replacements() {
 }
 
 #[test]
+fn applies_same_crate_version_updates_to_normal_and_dev_dependencies() {
+    let directory = tempfile::tempdir().expect("temporary project");
+    let project = Utf8PathBuf::from_path_buf(directory.path().to_path_buf()).expect("UTF-8 path");
+    std::fs::write(
+        project.join("Cargo.toml"),
+        "[dependencies]\ntokio = { version = \"1.53\", optional = true }\n[dev-dependencies]\ntokio = { version = \"1.53\", features = [\"macros\"] }\n",
+    )
+    .expect("manifest");
+    let baseline = Baseline::parse("tokio 1.54\n").expect("baseline");
+
+    let plan = plan_sync(&project, &baseline).expect("plan");
+    assert_eq!(plan.manifest_edits.len(), 2);
+    apply_sync(&plan).expect("apply");
+
+    let manifest =
+        std::fs::read_to_string(project.join("Cargo.toml")).expect("updated manifest");
+    assert!(manifest.contains("[dependencies]\ntokio = { version = \"1.54\", optional = true }"));
+    assert!(
+        manifest.contains(
+            "[dev-dependencies]\ntokio = { version = \"1.54\", features = [\"macros\"] }"
+        )
+    );
+}
+
+#[test]
 fn reports_plan_and_manifest_errors() {
     let directory = tempfile::tempdir().expect("temporary project");
     let project = Utf8PathBuf::from_path_buf(directory.path().to_path_buf()).expect("UTF-8 path");

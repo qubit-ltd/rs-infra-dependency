@@ -150,12 +150,17 @@ pub fn apply_sync(plan: &SyncPlan) -> Result<(), PolicyError> {
             else {
                 continue;
             };
-            if let Item::Value(Value::String(_)) = item {
+            if let Item::Value(Value::String(current)) = item
+                && current.value() == &edit.old
+            {
                 *item = value(edit.new.clone());
                 updated = true;
                 break;
             }
             if let Some(inline) = item.as_inline_table_mut() {
+                if inline.get("version").and_then(Value::as_str) != Some(edit.old.as_str()) {
+                    continue;
+                }
                 inline.insert("version", Value::from(edit.new.clone()));
                 updated = true;
                 break;
