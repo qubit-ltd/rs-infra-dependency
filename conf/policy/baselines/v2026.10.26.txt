@@ -36,6 +36,7 @@ futures-util ^0.3
 getrandom ^0.4
 hashbrown ^0.17
 heck ^0.5
+hex ^0.4
 http ^1.5
 http-body-util ^0.1
 httpdate ^1.0
@@ -43,6 +44,7 @@ hyper ^1.12
 hyper-util ^0.1
 indexmap ^2.14
 inventory ^0.3
+jsonschema ^0.60
 leb128 ^0.2
 libc ^0.2
 libfuzzer-sys ^0.4
@@ -82,6 +84,7 @@ same-file ^1.0
 semver ^1.0
 serde ^1.0
 serde_ignored ^0.1
+serde_jcs ^0.2
 serde_json ^1.0
 serde_json_canonicalizer ^0.4
 serde_norway ^0.9
