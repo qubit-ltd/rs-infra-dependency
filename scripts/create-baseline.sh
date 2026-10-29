@@ -46,7 +46,9 @@ if [[ "$output" != /* ]]; then output="$(pwd -P)/$output"; fi
 command -v jq >/dev/null || { printf '需要 jq 才能交互选择依赖版本。\n' >&2; exit 2; }
 
 expanded=()
-for root in "${roots[@]}"; do
+for root_index in "${!roots[@]}"; do
+    root=${roots[$root_index]}
+    printf '[1/5] 正在扫描项目目录（%d/%d）：%s\n' "$((root_index + 1))" "${#roots[@]}" "$root" >&2
     mapfile -d '' -t manifests < <(
         find "$root" -mindepth 1 -type d \( -name '.*' -o -name target -o -path '*/tests/fixtures' \) -prune -o \
             -type f -name Cargo.toml -print0 | sort -z
@@ -59,7 +61,9 @@ done
 roots=("${expanded[@]}")
 
 valid_roots=()
-for root in "${roots[@]}"; do
+for root_index in "${!roots[@]}"; do
+    root=${roots[$root_index]}
+    printf '[2/5] 正在解析 Cargo 项目（%d/%d）：%s\n' "$((root_index + 1))" "${#roots[@]}" "$root" >&2
     if cargo metadata --manifest-path "${root}/Cargo.toml" --format-version 1 >/dev/null 2>&1; then
         valid_roots+=("$root")
     else
@@ -132,9 +136,12 @@ normalize_requirement() {
 args=(run --quiet --bin rs-infra-dependency -- inventory)
 for root in "${roots[@]}"; do args+=(--root "$root"); done
 args+=(--format json --output "$inventory")
+printf '[3/5] 正在汇总依赖清单（%d 个 Cargo 项目），Cargo 首次构建可能需要一些时间。\n' "${#roots[@]}" >&2
 (cd "$repo_dir" && cargo "${args[@]}")
 
 mkdir -p "$(dirname -- "$output")"
+dependency_count=$(jq '.direct_requirements | length' "$inventory")
+printf '[4/5] 正在整理 %d 个直接依赖；遇到版本冲突时会在此阶段询问选择。\n' "$dependency_count" >&2
 while IFS= read -r name; do
         internal=0
         for prefix in "${internal_prefixes[@]}"; do
@@ -144,31 +151,31 @@ while IFS= read -r name; do
         mapfile -t choices < <(jq -r --arg n "$name" '.direct_requirements[$n][]' "$inventory")
         selected="${choices[0]}"
         if ((${#choices[@]} > 1)); then
-            same_major=1
-            major=""
+            simple_stable=1
+            highest_major=-1
             highest_minor=-1
+            highest_patch=-1
             for choice in "${choices[@]}"; do
-                if [[ ! "$choice" =~ ^[=^]?([0-9]+)(\.([0-9]+)(\.[0-9]+)?)?$ ]]; then
-                    same_major=0
+                if [[ ! "$choice" =~ ^[=^]?([0-9]+)(\.([0-9]+))?(\.([0-9]+))?$ ]]; then
+                    simple_stable=0
                     break
                 fi
-                choice_major="${BASH_REMATCH[1]}"
-                if [[ -n "$major" && "$choice_major" != "$major" ]]; then
-                    same_major=0
-                    break
-                fi
-                major="$choice_major"
-                choice_minor=-1
-                if [[ -n "${BASH_REMATCH[3]:-}" ]]; then
-                    choice_minor=$((10#${BASH_REMATCH[3]}))
-                fi
-                if ((choice_minor > highest_minor)); then
+                choice_major=$((10#${BASH_REMATCH[1]}))
+                choice_minor=0
+                choice_patch=0
+                [[ -n "${BASH_REMATCH[3]:-}" ]] && choice_minor=$((10#${BASH_REMATCH[3]}))
+                [[ -n "${BASH_REMATCH[5]:-}" ]] && choice_patch=$((10#${BASH_REMATCH[5]}))
+                if ((choice_major > highest_major ||
+                    (choice_major == highest_major && choice_minor > highest_minor) ||
+                    (choice_major == highest_major && choice_minor == highest_minor && choice_patch > highest_patch))); then
+                    highest_major=$choice_major
                     highest_minor=$choice_minor
+                    highest_patch=$choice_patch
                     selected="$choice"
                 fi
             done
         fi
-        if ((${#choices[@]} > 1 && !same_major)); then
+        if ((${#choices[@]} > 1 && !simple_stable)); then
             printf '\n依赖 %s 存在多个声明版本：\n' "$name" >&2
             for i in "${!choices[@]}"; do printf '  %d) %s\n' "$((i + 1))" "${choices[$i]}" >&2; done
             printf '  c) 自定义 Cargo 版本要求\n' >&2
@@ -202,6 +209,7 @@ while IFS= read -r name; do
         printf '%s\t%s\n' "$name" "$selected" >>"$rules"
 done < <(jq -r '.direct_requirements | keys[]' "$inventory")
 
+printf '[5/5] 正在写入 baseline 文件：%s\n' "$output" >&2
 if [[ "$output" == *.toml ]]; then
     {
         printf 'format = 3\n\n[direct]\n'
@@ -234,6 +242,7 @@ elif [[ "$output" == "${baseline_dir}/${release}.toml" ]]; then
 fi
 
 if [[ -n "$manifest_source" ]]; then
+    printf '正在更新当前基线指针和 conf/manifest.json。\n' >&2
     current_path="${repo_dir}/conf/policy/current.toml"
     manifest_path="${repo_dir}/conf/manifest.json"
     [[ -f "$current_path" && -f "$manifest_path" ]] || {

@@ -34,7 +34,7 @@ cargo install --path .
   --release v2026.09.13
 ```
 
-每个 `--root` 可以是 Rust 项目，也可以是其父目录；脚本会递归扫描子目录中的 Cargo 清单，跳过隐藏目录、`target` 和 `tests/fixtures`。脚本自动排除 `path`、`workspace` 依赖；已发布但仍属内部生态的 crate 通过调用方传入的 `--internal-prefix` 识别。同一依赖的稳定版本声明若属于同一个 major，脚本自动选最高的已声明 minor（例如 `^4` 和 `^4.5` 选 `^4.5`）；其他冲突才询问。普通稳定版本统一写成 `^major.minor`；只有 major 的声明会查询该主版本已发布的最高 minor。预发布版本（如 `=2.0.0-rc.12`）写成 `>=2.0.0-rc.12,<2.1`。
+每个 `--root` 可以是 Rust 项目，也可以是其父目录；脚本会递归扫描子目录中的 Cargo 清单，跳过隐藏目录、`target` 和 `tests/fixtures`。脚本自动排除 `path`、`workspace` 依赖；已发布但仍属内部生态的 crate 通过调用方传入的 `--internal-prefix` 识别。简单稳定版本要求发生冲突时，脚本自动选择最高声明版本，包括跨 major 版本比较（例如 `^2` 和 `^3.0` 选 `^3.0`，`^0.9` 和 `^1.1.6` 选 `^1.1`）；其他冲突才询问。普通稳定版本统一写成 `^major.minor`；只有 major 的声明会查询该主版本已发布的最高 minor。预发布版本（如 `=2.0.0-rc.12`）写成 `>=2.0.0-rc.12,<2.1`。
 
 结果默认写为可用且排序稳定的 `conf/policy/baselines/<release>.txt`；输出文件名使用 `.toml` 时生成新格式：
 
