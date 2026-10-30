@@ -68,7 +68,7 @@ rg -x 'syn \^2\.0' "$output"
 rg -x 'serde_json \^1\.0' "$output"
 rg -x 'quote \^1\.0' "$output"
 if rg -F '[profiles.' "$output"; then
-    printf 'baseline 不应包含 profile 表。\n' >&2
+    printf 'Baseline must not contain a profile table.\n' >&2
     exit 1
 fi
 
