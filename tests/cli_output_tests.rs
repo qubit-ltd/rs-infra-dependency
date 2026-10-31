@@ -291,17 +291,31 @@ fn test_recursive_check_and_sync_include_nested_crates() {
     )
     .expect("nested manifest");
     let check = binary()
-        .args(["--project", project.to_str().expect("UTF-8 project"), "--recursive", "check"])
+        .args([
+            "--project",
+            project.to_str().expect("UTF-8 project"),
+            "--recursive",
+            "check",
+        ])
         .output()
         .expect("recursive check");
     assert!(!check.status.success());
     assert!(String::from_utf8_lossy(&check.stderr).contains("num-bigint"));
     let sync = binary()
-        .args(["--project", project.to_str().expect("UTF-8 project"), "--recursive", "sync"])
+        .args([
+            "--project",
+            project.to_str().expect("UTF-8 project"),
+            "--recursive",
+            "sync",
+        ])
         .output()
         .expect("recursive sync");
     assert!(sync.status.success(), "{}", String::from_utf8_lossy(&sync.stderr));
-    assert!(std::fs::read_to_string(&nested_manifest).expect("updated nested manifest").contains("num-bigint = \"^0.4\""));
+    assert!(
+        std::fs::read_to_string(&nested_manifest)
+            .expect("updated nested manifest")
+            .contains("num-bigint = \"^0.4\"")
+    );
 }
 
 #[test]

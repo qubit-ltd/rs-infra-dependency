@@ -69,14 +69,9 @@ fn applies_same_crate_version_updates_to_normal_and_dev_dependencies() {
     assert_eq!(plan.manifest_edits.len(), 2);
     apply_sync(&plan).expect("apply");
 
-    let manifest =
-        std::fs::read_to_string(project.join("Cargo.toml")).expect("updated manifest");
+    let manifest = std::fs::read_to_string(project.join("Cargo.toml")).expect("updated manifest");
     assert!(manifest.contains("[dependencies]\ntokio = { version = \"1.54\", optional = true }"));
-    assert!(
-        manifest.contains(
-            "[dev-dependencies]\ntokio = { version = \"1.54\", features = [\"macros\"] }"
-        )
-    );
+    assert!(manifest.contains("[dev-dependencies]\ntokio = { version = \"1.54\", features = [\"macros\"] }"));
 }
 
 #[test]

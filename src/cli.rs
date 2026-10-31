@@ -215,16 +215,18 @@ impl Cli {
         } else {
             vec![self.project.clone()]
         };
-        let result = match &self.command {
+        match &self.command {
             Command::Inventory { .. } => unreachable!("inventory handled before baseline loading"),
             Command::Check => {
                 let mut violations = 0;
                 for project in &projects {
-                    let temporary_lockfile =
-                        TemporaryLockfile::prepare(project, needs_lock, self.temporary_lockfile)?;
+                    let temporary_lockfile = TemporaryLockfile::prepare(project, needs_lock, self.temporary_lockfile)?;
                     let evaluation = evaluate(project, &config, &baseline)?;
                     for violation in &evaluation.violations {
-                        eprintln!("{}: [{}] {}: {}", project, violation.code, violation.crate_name, violation.message);
+                        eprintln!(
+                            "{}: [{}] {}: {}",
+                            project, violation.code, violation.crate_name, violation.message
+                        );
                     }
                     violations += evaluation.violations.len();
                     if let Some(lockfile) = temporary_lockfile {
@@ -269,8 +271,7 @@ impl Cli {
                 }
                 if *dry_run { Ok(()) } else { apply_sync(&plan) }
             }
-        };
-        result
+        }
     }
 }
 
