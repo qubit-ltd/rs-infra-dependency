@@ -103,8 +103,8 @@
       "sha256": "bd679d654b9a6b06a53fb2e45d6c02f3dceb1cb574be9c95f7aa1603c104760d"
     }
   },
-  "package_sha256": "ef62a538343eaed4f027c098445d0dd63cbeb6332df4fedee336a1233a1b2e94",
+  "package_sha256": "4d0ac45e74fbcfb9faf23f169d08fe16e90df1de003ad51e87c14bd88cd2e818",
   "schema": 1,
   "source_repository": "https://github.com/qubit-ltd/rs-infra-tools.git",
-  "source_revision": "4b42751da963fa0c3c7128ca8e748710a0d5ed1f"
+  "source_revision": "5345538904e1a47973963679e56d9a20450d1c25"
 }
