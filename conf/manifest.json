@@ -10,30 +10,6 @@
       "target": "policy/current.toml"
     },
     {
-      "source": "policy/baselines/v2026.10.16.txt",
-      "target": "policy/baselines/v2026.10.16.txt"
-    },
-    {
-      "source": "policy/baselines/v2026.10.21.txt",
-      "target": "policy/baselines/v2026.10.21.txt"
-    },
-    {
-      "source": "policy/baselines/v2026.10.25.txt",
-      "target": "policy/baselines/v2026.10.25.txt"
-    },
-    {
-      "source": "policy/baselines/v2026.10.26.txt",
-      "target": "policy/baselines/v2026.10.26.txt"
-    },
-    {
-      "source": "policy/baselines/v2026.10.27.txt",
-      "target": "policy/baselines/v2026.10.27.txt"
-    },
-    {
-      "source": "policy/baselines/v2026.10.29.txt",
-      "target": "policy/baselines/v2026.10.29.txt"
-    },
-    {
       "source": "policy/baselines/v2026.10.31.txt",
       "target": "policy/baselines/v2026.10.31.txt"
     }
