@@ -315,3 +315,49 @@ fn discover_projects(root: &camino::Utf8Path) -> Result<Vec<Utf8PathBuf>, Policy
     projects[1..].sort();
     Ok(projects)
 }
+
+#[cfg(test)]
+mod tests {
+    use camino::Utf8PathBuf;
+
+    use super::discover_projects;
+
+    #[test]
+    fn discovers_nested_crates_and_skips_ignored_directories() {
+        let temporary = tempfile::tempdir().expect("temporary project");
+        let root = Utf8PathBuf::from_path_buf(temporary.path().to_owned()).expect("UTF-8 root");
+        for relative in [
+            "zeta",
+            "alpha",
+            "target/ignored",
+            ".hidden/ignored",
+            "tests/fixtures/ignored",
+        ] {
+            let directory = root.join(relative);
+            std::fs::create_dir_all(&directory).expect("nested directory");
+            std::fs::write(directory.join("Cargo.toml"), "[package]\nname = \"nested\"\n").expect("manifest");
+        }
+
+        let projects = discover_projects(&root).expect("discover nested crates");
+
+        assert_eq!(projects, vec![root.clone(), root.join("alpha"), root.join("zeta")]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn reports_discovery_errors_for_missing_roots_and_non_utf8_nested_paths() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let temporary = tempfile::tempdir().expect("temporary project");
+        let root = Utf8PathBuf::from_path_buf(temporary.path().to_owned()).expect("UTF-8 root");
+        let missing = root.join("missing");
+        let error = discover_projects(&missing).expect_err("missing root should fail");
+        assert_eq!(error.code(), "DP001");
+
+        let non_utf8_name = std::ffi::OsString::from_vec(vec![b'n', b'o', b'n', b'-', 0xff]);
+        std::fs::create_dir(root.as_std_path().join(non_utf8_name)).expect("non-UTF-8 nested directory");
+        let error = discover_projects(&root).expect_err("non-UTF-8 nested path should fail");
+        assert_eq!(error.code(), "DP301");
+        assert!(error.to_string().contains("nested crate path is not UTF-8"));
+    }
+}

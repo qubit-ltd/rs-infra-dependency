@@ -113,6 +113,9 @@ impl Drop for TemporaryLockfile {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
+    use std::process::Command;
+
     use camino::Utf8PathBuf;
 
     use super::TemporaryLockfile;
@@ -212,5 +215,64 @@ mod tests {
         std::fs::write(root.join(".cargo/config.toml"), "[net]\noffline = true\n").expect("offline Cargo config");
         assert!(TemporaryLockfile::prepare(&root, true, true).is_err());
         assert!(!root.join("Cargo.lock").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn reports_when_the_current_directory_disappears_during_lockfile_preparation() {
+        const CHILD_TEST: &str =
+            "temporary_lockfile::tests::reports_when_the_current_directory_disappears_during_lockfile_preparation";
+        const CHILD_MODE: &str = "RS_INFRA_TEST_REMOVED_CURRENT_DIRECTORY";
+
+        if std::env::var_os(CHILD_MODE).is_some() {
+            let project = Utf8PathBuf::from("fixture");
+            let error = match TemporaryLockfile::prepare(&project, true, true) {
+                Ok(_) => panic!("removed current directory should fail"),
+                Err(error) => error,
+            };
+            assert_eq!(error.code(), "DP405");
+            assert!(error.to_string().contains("failed to determine current directory"));
+            return;
+        }
+
+        let temporary = tempfile::tempdir().expect("temporary working directory");
+        let root = temporary.path();
+        std::fs::create_dir_all(root.join("fixture/.infra/tools")).expect("fixture config directory");
+        std::fs::write(
+            root.join("fixture/.infra/tools/defaults.toml"),
+            "build_toolchain = \"1.94.0\"\n",
+        )
+        .expect("tool defaults");
+        std::fs::write(
+            root.join("fixture/Cargo.toml"),
+            "[package]\nname = \"lockfile-fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+        )
+        .expect("manifest");
+
+        let bin = root.join("bin");
+        std::fs::create_dir(&bin).expect("fake Cargo directory");
+        let fake_cargo = bin.join("cargo");
+        std::fs::write(
+            &fake_cargo,
+            "#!/bin/sh\nprintf '%s\\n' \"$RS_INFRA_TEST_FIXTURE_ROOT/fixture/Cargo.toml\"\n/bin/rm -rf -- \"$RS_INFRA_TEST_FIXTURE_ROOT\"\n",
+        )
+        .expect("fake Cargo command");
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&fake_cargo, std::fs::Permissions::from_mode(0o755)).expect("make Cargo executable");
+
+        let output = Command::new(std::env::current_exe().expect("test executable"))
+            .args(["--exact", CHILD_TEST])
+            .env(CHILD_MODE, "1")
+            .env("RS_INFRA_TEST_FIXTURE_ROOT", root)
+            .env("PATH", format!("{}:/usr/bin:/bin", bin.display()))
+            .current_dir(root)
+            .output()
+            .expect("run isolated current-directory test");
+        assert!(
+            output.status.success(),
+            "child test failed: {}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 }
