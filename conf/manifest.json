@@ -32,6 +32,10 @@
     {
       "source": "policy/baselines/v2026.10.29.txt",
       "target": "policy/baselines/v2026.10.29.txt"
+    },
+    {
+      "source": "policy/baselines/v2026.10.31.txt",
+      "target": "policy/baselines/v2026.10.31.txt"
     }
   ]
 }
