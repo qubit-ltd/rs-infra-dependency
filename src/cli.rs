@@ -275,7 +275,25 @@ impl Cli {
     }
 }
 
+/// Discovers nested Cargo projects while honoring explicit archive exclusions.
+///
+/// Hidden directories, build output, test fixtures, and configured archive
+/// paths are not traversed.
+///
+/// # Errors
+///
+/// Returns a [`PolicyError`] when a directory cannot be read, its manifest
+/// configuration is invalid, or a nested path is not valid UTF-8.
+///
+/// # Parameters
+///
+/// * `root` - Project root whose nested Cargo projects should be found.
+///
+/// # Returns
+///
+/// Returns the root followed by all discovered nested project directories.
 fn discover_projects(root: &camino::Utf8Path) -> Result<Vec<Utf8PathBuf>, PolicyError> {
+    let excluded_projects = excluded_projects(root)?;
     let mut projects = vec![root.to_owned()];
     let mut pending = vec![root.to_owned()];
     while let Some(directory) = pending.pop() {
@@ -306,6 +324,15 @@ fn discover_projects(root: &camino::Utf8Path) -> Result<Vec<Utf8PathBuf>, Policy
             let path = Utf8PathBuf::from_path_buf(entry.path()).map_err(|path| PolicyError::Sync {
                 message: format!("nested crate path is not UTF-8: {}", path.display()),
             })?;
+            let relative = path.strip_prefix(root).map_err(|_| PolicyError::Sync {
+                message: format!("nested crate path escaped project root: {path}"),
+            })?;
+            if excluded_projects
+                .iter()
+                .any(|excluded| relative == excluded || relative.starts_with(excluded))
+            {
+                continue;
+            }
             if path.join("Cargo.toml").is_file() {
                 projects.push(path.clone());
             }
@@ -316,11 +343,81 @@ fn discover_projects(root: &camino::Utf8Path) -> Result<Vec<Utf8PathBuf>, Policy
     Ok(projects)
 }
 
+/// Reads project-specific nested crate paths that recursive checks must omit.
+///
+/// Paths are declared in the root package manifest under
+/// `package.metadata.rs-infra-dependency.exclude-projects`. Excluding a path
+/// also excludes all nested directories below it.
+///
+/// # Errors
+///
+/// Returns a [`PolicyError`] when the root manifest cannot be read, is invalid,
+/// or contains an empty, absolute, or parent-traversing excluded path.
+///
+/// # Parameters
+///
+/// * `root` - Project root containing the `Cargo.toml` to inspect.
+///
+/// # Returns
+///
+/// Returns the validated paths relative to the project root.
+fn excluded_projects(root: &camino::Utf8Path) -> Result<Vec<Utf8PathBuf>, PolicyError> {
+    let manifest = root.join("Cargo.toml");
+    let text = match std::fs::read_to_string(manifest.as_std_path()) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(source) => {
+            return Err(PolicyError::ReadConfig {
+                path: manifest.to_string(),
+                source,
+            });
+        }
+    };
+    let value: toml::Value = toml::from_str(&text).map_err(|source| PolicyError::ParseConfig {
+        path: manifest.to_string(),
+        source,
+    })?;
+    let Some(excluded) = value
+        .get("package")
+        .and_then(|package| package.get("metadata"))
+        .and_then(|metadata| metadata.get("rs-infra-dependency"))
+        .and_then(|configuration| configuration.get("exclude-projects"))
+    else {
+        return Ok(Vec::new());
+    };
+    let excluded = excluded.as_array().ok_or_else(|| PolicyError::InvalidConfig {
+        code: "DP001",
+        message: "package.metadata.rs-infra-dependency.exclude-projects must be an array of relative paths".into(),
+    })?;
+    excluded
+        .iter()
+        .map(|entry| {
+            let path = entry.as_str().ok_or_else(|| PolicyError::InvalidConfig {
+                code: "DP001",
+                message: "package.metadata.rs-infra-dependency.exclude-projects must contain only strings".into(),
+            })?;
+            let path = camino::Utf8Path::new(path);
+            if path.as_str().is_empty()
+                || path == "."
+                || path.is_absolute()
+                || path.components().any(|component| component.as_str() == "..")
+            {
+                return Err(PolicyError::InvalidConfig {
+                    code: "DP001",
+                    message: format!("excluded project path must stay below the project root: {path}"),
+                });
+            }
+            Ok(path.to_owned())
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use camino::Utf8PathBuf;
 
     use super::discover_projects;
+    use super::excluded_projects;
 
     #[test]
     fn discovers_nested_crates_and_skips_ignored_directories() {
@@ -341,6 +438,54 @@ mod tests {
         let projects = discover_projects(&root).expect("discover nested crates");
 
         assert_eq!(projects, vec![root.clone(), root.join("alpha"), root.join("zeta")]);
+    }
+
+    #[test]
+    fn test_recursive_discovery_skips_explicit_archive_and_keeps_other_nested_crates() {
+        let temporary = tempfile::tempdir().expect("temporary project");
+        let root = Utf8PathBuf::from_path_buf(temporary.path().to_owned()).expect("UTF-8 root");
+        std::fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"root\"\nversion = \"0.1.0\"\n\n[package.metadata.rs-infra-dependency]\nexclude-projects = [\"doc/archive\"]\n",
+        )
+        .expect("root manifest");
+        for relative in [
+            "active",
+            "doc/archive/baseline",
+            "doc/archive/candidate",
+            "doc/archive-copy",
+        ] {
+            let directory = root.join(relative);
+            std::fs::create_dir_all(&directory).expect("nested directory");
+            std::fs::write(directory.join("Cargo.toml"), "[package]\nname = \"nested\"\n").expect("manifest");
+        }
+
+        let projects = discover_projects(&root).expect("discover nested crates");
+
+        assert_eq!(
+            projects,
+            vec![root.clone(), root.join("active"), root.join("doc/archive-copy")]
+        );
+    }
+
+    #[test]
+    fn test_excluded_project_paths_cannot_escape_or_replace_the_project_root() {
+        let temporary = tempfile::tempdir().expect("temporary project");
+        let root = Utf8PathBuf::from_path_buf(temporary.path().to_owned()).expect("UTF-8 root");
+        for path in ["", ".", "../outside", "/absolute/path"] {
+            std::fs::write(
+                root.join("Cargo.toml"),
+                format!(
+                    "[package]\nname = \"root\"\nversion = \"0.1.0\"\n\n[package.metadata.rs-infra-dependency]\nexclude-projects = [{path:?}]\n"
+                ),
+            )
+            .expect("root manifest");
+
+            let error = excluded_projects(&root).expect_err("unsafe path should be rejected");
+
+            assert_eq!(error.code(), "DP001");
+            assert!(error.to_string().contains("excluded project path"));
+        }
     }
 
     #[cfg(unix)]

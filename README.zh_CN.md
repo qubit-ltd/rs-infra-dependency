@@ -36,6 +36,15 @@ cargo install --path .
 
 每个 `--root` 可以是 Rust 项目，也可以是其父目录；脚本会递归扫描子目录中的 Cargo 清单，跳过隐藏目录、`target` 和 `tests/fixtures`。脚本自动排除 `path`、`workspace` 依赖；已发布但仍属内部生态的 crate 通过调用方传入的 `--internal-prefix` 识别。简单稳定版本要求发生冲突时，脚本自动选择最高声明版本，包括跨 major 版本比较（例如 `^2` 和 `^3.0` 选 `^3.0`，`^0.9` 和 `^1.1.6` 选 `^1.1`）；其他冲突才询问。普通稳定版本统一写成 `^major.minor`；只有 major 的声明会查询该主版本已发布的最高 minor。预发布版本（如 `=2.0.0-rc.12`）写成 `>=2.0.0-rc.12,<2.1`。
 
+递归检查也会发现独立的嵌套 Cargo 清单。若某些归档清单只是历史证据、并非当前要检查的包，可在父包的 metadata 中声明它们的相对目录：
+
+```toml
+[package.metadata.rs-infra-dependency]
+exclude-projects = ["doc/performance-archive"]
+```
+
+每项会将对应目录及其子目录排除在递归 `check` 和 `sync` 之外；其他嵌套 Cargo 项目仍会纳入检查。路径必须相对于项目根目录，且不能越出该目录。
+
 结果默认写为可用且排序稳定的 `conf/policy/baselines/<release>.txt`；输出文件名使用 `.toml` 时生成新格式：
 
 ```text

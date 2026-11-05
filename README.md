@@ -51,6 +51,19 @@ and `^0.9` and `^1.1.6` become `^1.1`). Other conflicts require a choice.
 Simple stable requirements are written as `^major.minor`; a major-only
 requirement uses the highest published minor in that major line. A prerelease
 such as `=2.0.0-rc.12` becomes `>=2.0.0-rc.12,<2.1`.
+
+Recursive checks also discover standalone nested Cargo manifests. For archived
+manifests that are evidence rather than active packages, declare their relative
+directories in the parent package metadata:
+
+```toml
+[package.metadata.rs-infra-dependency]
+exclude-projects = ["doc/performance-archive"]
+```
+
+Each entry excludes that directory and its descendants from recursive `check`
+and `sync`; other nested Cargo projects remain included. Paths must be relative
+and stay inside the project root.
 It writes an immediately usable, sorted file at
 `conf/policy/baselines/<release>.txt` (use a `.toml` output name for the new format):
 
