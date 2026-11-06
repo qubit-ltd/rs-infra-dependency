@@ -11,6 +11,7 @@
 use camino::Utf8Path;
 use toml_edit::DocumentMut;
 use toml_edit::Item;
+use toml_edit::TableLike;
 use toml_edit::Value;
 use toml_edit::value;
 
@@ -65,35 +66,53 @@ pub fn plan_sync(project: &Utf8Path, baseline: &Baseline) -> Result<SyncPlan, Po
         let Some(table) = document.get(table_name).and_then(Item::as_table_like) else {
             continue;
         };
-        for (name, item) in table.iter() {
-            let Some(requirement) = baseline.requirement(name) else {
+        plan_table(&mut plan, &manifest_path, table, baseline);
+    }
+    if let Some(targets) = document.get("target").and_then(Item::as_table_like) {
+        for (_, target) in targets.iter() {
+            let Some(target) = target.as_table_like() else {
                 continue;
             };
-            if let Item::Value(Value::String(old)) = item {
-                let old = old.value().to_owned();
-                if old != requirement.text() {
-                    add_edit(&mut plan, &manifest_path, name, old, requirement.text());
-                }
-            } else if let Some(inline) = item.as_inline_table() {
-                if inline.get("path").is_some() || inline.get("workspace").is_some() {
+            for table_name in ["dependencies", "dev-dependencies", "build-dependencies"] {
+                let Some(table) = target.get(table_name).and_then(Item::as_table_like) else {
                     continue;
-                }
-                match inline.get("version").and_then(Value::as_str) {
-                    Some(old) if old != requirement.text() => {
-                        add_edit(&mut plan, &manifest_path, name, old.into(), requirement.text())
-                    }
-                    Some(_) => {}
-                    None => plan.blocked.push(Violation {
-                        code: "DP301",
-                        crate_name: name.into(),
-                        message: "external dependency has no version field".into(),
-                        exception_id: None,
-                    }),
-                }
+                };
+                plan_table(&mut plan, &manifest_path, table, baseline);
             }
         }
     }
     Ok(plan)
+}
+
+/// Plans version replacements for one Cargo dependency table.
+fn plan_table(plan: &mut SyncPlan, manifest_path: &Utf8Path, table: &dyn TableLike, baseline: &Baseline) {
+    for (name, item) in table.iter() {
+        let Some(requirement) = baseline.requirement(name) else {
+            continue;
+        };
+        if let Item::Value(Value::String(old)) = item {
+            let old = old.value().to_owned();
+            if old != requirement.text() {
+                add_edit(plan, manifest_path, name, old, requirement.text());
+            }
+        } else if let Some(inline) = item.as_inline_table() {
+            if inline.get("path").is_some() || inline.get("workspace").is_some() {
+                continue;
+            }
+            match inline.get("version").and_then(Value::as_str) {
+                Some(old) if old != requirement.text() => {
+                    add_edit(plan, manifest_path, name, old.into(), requirement.text())
+                }
+                Some(_) => {}
+                None => plan.blocked.push(Violation {
+                    code: "DP301",
+                    crate_name: name.into(),
+                    message: "external dependency has no version field".into(),
+                    exception_id: None,
+                }),
+            }
+        }
+    }
 }
 
 /// Adds one manifest replacement and its corresponding compatibility update.
@@ -143,27 +162,27 @@ pub fn apply_sync(plan: &SyncPlan) -> Result<(), PolicyError> {
             message: format!("failed to parse {}: {error}", edit.path),
         })?;
         let mut updated = false;
-        for table_name in ["dependencies", "dev-dependencies", "build-dependencies"] {
-            let Some(item) = document
-                .get_mut(table_name)
-                .and_then(|table| table.get_mut(&edit.dependency))
-            else {
-                continue;
-            };
-            if let Item::Value(Value::String(current)) = item
-                && current.value() == &edit.old
-            {
-                *item = value(edit.new.clone());
-                updated = true;
-                break;
-            }
-            if let Some(inline) = item.as_inline_table_mut() {
-                if inline.get("version").and_then(Value::as_str) != Some(edit.old.as_str()) {
-                    continue;
+        'tables: for table_name in ["dependencies", "dev-dependencies", "build-dependencies"] {
+            if let Some(table) = document.get_mut(table_name).and_then(Item::as_table_like_mut) {
+                if apply_edit_to_table(table, edit) {
+                    updated = true;
+                    break 'tables;
                 }
-                inline.insert("version", Value::from(edit.new.clone()));
-                updated = true;
-                break;
+            }
+        }
+        if !updated && let Some(targets) = document.get_mut("target").and_then(Item::as_table_like_mut) {
+            'targets: for (_, target) in targets.iter_mut() {
+                let Some(target) = target.as_table_like_mut() else {
+                    continue;
+                };
+                for table_name in ["dependencies", "dev-dependencies", "build-dependencies"] {
+                    if let Some(table) = target.get_mut(table_name).and_then(Item::as_table_like_mut) {
+                        if apply_edit_to_table(table, edit) {
+                            updated = true;
+                            break 'targets;
+                        }
+                    }
+                }
             }
         }
         if !updated {
@@ -176,6 +195,27 @@ pub fn apply_sync(plan: &SyncPlan) -> Result<(), PolicyError> {
         })?;
     }
     Ok(())
+}
+
+/// Applies a planned replacement to the matching declaration in one table.
+fn apply_edit_to_table(table: &mut dyn TableLike, edit: &FileEdit) -> bool {
+    let Some(item) = table.get_mut(&edit.dependency) else {
+        return false;
+    };
+    if let Item::Value(Value::String(current)) = item
+        && current.value() == &edit.old
+    {
+        *item = value(edit.new.clone());
+        return true;
+    }
+    if let Some(inline) = item.as_inline_table_mut() {
+        if inline.get("version").and_then(Value::as_str) != Some(edit.old.as_str()) {
+            return false;
+        }
+        inline.insert("version", Value::from(edit.new.clone()));
+        return true;
+    }
+    false
 }
 
 #[cfg(test)]

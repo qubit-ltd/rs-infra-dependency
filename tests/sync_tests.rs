@@ -75,6 +75,27 @@ fn applies_same_crate_version_updates_to_normal_and_dev_dependencies() {
 }
 
 #[test]
+fn plans_and_applies_target_specific_dependency_replacements() {
+    let directory = tempfile::tempdir().expect("temporary project");
+    let project = Utf8PathBuf::from_path_buf(directory.path().to_path_buf()).expect("UTF-8 path");
+    std::fs::write(
+        project.join("Cargo.toml"),
+        "[target.'cfg(not(loom))'.dev-dependencies]\ntokio = { version = \"1.53\", features = [\"macros\"] }\n\n[target.x86_64-unknown-linux-gnu.dependencies]\nserde = \"1.0\"\n\n[target.'cfg(unix)'.build-dependencies]\ncc = { version = \"1.0\" }\n",
+    )
+    .expect("manifest");
+    let baseline = Baseline::parse("tokio 1.54\nserde 2.0\ncc 2.0\n").expect("baseline");
+
+    let plan = plan_sync(&project, &baseline).expect("plan");
+    assert_eq!(plan.manifest_edits.len(), 3);
+    apply_sync(&plan).expect("apply");
+
+    let manifest = std::fs::read_to_string(project.join("Cargo.toml")).expect("updated manifest");
+    assert!(manifest.contains("version = \"1.54\""));
+    assert!(manifest.contains("serde = \"2.0\""));
+    assert!(manifest.contains("cc = { version = \"2.0\" }"));
+}
+
+#[test]
 fn reports_plan_and_manifest_errors() {
     let directory = tempfile::tempdir().expect("temporary project");
     let project = Utf8PathBuf::from_path_buf(directory.path().to_path_buf()).expect("UTF-8 path");
