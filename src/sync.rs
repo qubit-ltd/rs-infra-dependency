@@ -111,6 +111,22 @@ fn plan_table(plan: &mut SyncPlan, manifest_path: &Utf8Path, table: &dyn TableLi
                     exception_id: None,
                 }),
             }
+        } else if let Some(table) = item.as_table() {
+            if table.get("path").is_some() || table.get("workspace").is_some() {
+                continue;
+            }
+            match table.get("version").and_then(Item::as_str) {
+                Some(old) if old != requirement.text() => {
+                    add_edit(plan, manifest_path, name, old.into(), requirement.text())
+                }
+                Some(_) => {}
+                None => plan.blocked.push(Violation {
+                    code: "DP301",
+                    crate_name: name.into(),
+                    message: "external dependency has no version field".into(),
+                    exception_id: None,
+                }),
+            }
         }
     }
 }
@@ -215,6 +231,13 @@ fn apply_edit_to_table(table: &mut dyn TableLike, edit: &FileEdit) -> bool {
         inline.insert("version", Value::from(edit.new.clone()));
         return true;
     }
+    if let Some(table) = item.as_table_mut() {
+        if table.get("version").and_then(Item::as_str) != Some(edit.old.as_str()) {
+            return false;
+        }
+        table.insert("version", value(edit.new.clone()));
+        return true;
+    }
     false
 }
 
@@ -268,6 +291,30 @@ mod tests {
             blocked: Vec::new(),
         };
         assert!(apply_sync(&read_failure).is_err());
+    }
+
+    #[test]
+    fn synchronizes_regular_dependency_tables() {
+        let temporary = tempfile::tempdir().expect("temporary project");
+        let project = Utf8PathBuf::from_path_buf(temporary.path().to_owned()).expect("UTF-8 project path");
+        let manifest = project.join("Cargo.toml");
+        std::fs::write(
+            &manifest,
+            "[dependencies.ort]\nversion = \"=2.0.0-rc.12\"\noptional = true\n",
+        )
+        .expect("manifest");
+        let baseline = Baseline::parse("ort >=2.0.0-rc.12,<2.1\n").expect("baseline");
+
+        let plan = plan_sync(&project, &baseline).expect("sync plan");
+        assert_eq!(plan.manifest_edits.len(), 1);
+        assert_eq!(plan.manifest_edits[0].old, "=2.0.0-rc.12");
+        assert_eq!(plan.manifest_edits[0].new, ">=2.0.0-rc.12,<2.1");
+
+        apply_sync(&plan).expect("apply sync");
+
+        let updated = std::fs::read_to_string(manifest).expect("updated manifest");
+        assert!(updated.contains("version = \">=2.0.0-rc.12,<2.1\""));
+        assert!(updated.contains("optional = true"));
     }
 
     #[cfg(unix)]
