@@ -61,17 +61,26 @@ done
 roots=("${expanded[@]}")
 
 valid_roots=()
+skipped_projects=()
 for root_index in "${!roots[@]}"; do
     root=${roots[$root_index]}
-    printf '[2/5] Resolving Cargo projects (%d/%d): %s\n' "$((root_index + 1))" "${#roots[@]}" "$root" >&2
-    if cargo metadata --manifest-path "${root}/Cargo.toml" --format-version 1 >/dev/null 2>&1; then
+    printf '[2/5] Checking Cargo manifests (%d/%d): %s\n' "$((root_index + 1))" "${#roots[@]}" "$root" >&2
+    if metadata_error=$(cargo metadata --manifest-path "${root}/Cargo.toml" --format-version 1 --no-deps 2>&1); then
         valid_roots+=("$root")
     else
-        printf 'Skipping project that could not be resolved: %s (fix Cargo version/path dependencies separately)\n' "$root" >&2
+        metadata_error=${metadata_error//$'\n'/ }
+        skipped_projects+=("$root: $metadata_error")
     fi
 done
 roots=("${valid_roots[@]}")
-((${#roots[@]} > 0)) || { printf 'No Rust projects to scan.\n' >&2; exit 2; }
+((${#roots[@]} > 0)) || {
+    printf 'No Rust projects to scan.\n' >&2
+    if ((${#skipped_projects[@]} > 0)); then
+        printf 'Warnings encountered during scanning:\n' >&2
+        printf '  %s\n' "${skipped_projects[@]}" >&2
+    fi
+    exit 2
+}
 
 inventory=$(mktemp)
 rules=$(mktemp)
@@ -266,4 +275,12 @@ if [[ -n "$manifest_source" ]]; then
     printf 'Current baseline updated to %s and registered in conf/manifest.json.\n' "$release"
 else
     printf 'Custom output path is outside the standard baseline directory; current.toml and conf/manifest.json were not updated.\n'
+fi
+
+if ((${#skipped_projects[@]} > 0)) || [[ "$(jq '.warnings | length' "$inventory")" -gt 0 ]]; then
+    printf 'Warnings encountered during scanning:\n' >&2
+    if ((${#skipped_projects[@]} > 0)); then
+        printf '  %s\n' "${skipped_projects[@]}" >&2
+    fi
+    jq -r '.warnings[]? | "  " + .' "$inventory" >&2
 fi

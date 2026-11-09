@@ -91,6 +91,7 @@ pub struct InventoryProject {
 ///     projects: Vec::new(),
 ///     direct_requirements: Default::default(),
 ///     conflicts: Default::default(),
+///     warnings: Vec::new(),
 /// };
 /// assert!(inventory.projects.is_empty());
 /// ```
@@ -104,18 +105,26 @@ pub struct Inventory {
     pub direct_requirements: BTreeMap<String, Vec<String>>,
     /// Names whose declarations disagree and therefore need a policy decision.
     pub conflicts: BTreeMap<String, Vec<String>>,
+    /// Non-fatal Cargo metadata failures encountered while collecting the
+    /// resolved dependency graph. Direct declarations are still collected
+    /// when Cargo can parse manifests without resolving dependencies.
+    pub warnings: Vec<String>,
 }
 
 /// Scan project roots without changing manifests, lockfiles, or the baseline.
 ///
-/// Each root is passed to Cargo metadata, so workspace members and their
-/// resolved packages are reported together. The input paths are not required
-/// to be canonical, but each must identify a Cargo manifest.
+/// Each root is first passed to Cargo metadata with `--no-deps`, so workspace
+/// members and their direct declarations can be reported even when Cargo
+/// cannot resolve one of their dependencies. A second metadata pass collects
+/// resolved packages when possible. The input paths are not required to be
+/// canonical, but each must identify a Cargo manifest.
 ///
 /// # Errors
 ///
-/// Returns a configuration error when a project has no usable tool defaults,
-/// or [`PolicyError::Cargo`] when Cargo cannot load metadata for a root.
+/// Returns [`PolicyError::Cargo`] when Cargo cannot parse a root's manifests.
+/// Missing toolchain defaults and failures that occur only during dependency
+/// resolution are recorded as warnings and do not prevent collecting direct
+/// declarations.
 ///
 /// # Parameters
 ///
@@ -126,12 +135,24 @@ pub struct Inventory {
 /// Returns the collected inventory and conflicts across all supplied roots.
 pub fn scan_projects(projects: &[Utf8PathBuf]) -> Result<Inventory, PolicyError> {
     let mut scanned = Vec::with_capacity(projects.len());
+    let mut warnings = Vec::new();
     for project in projects {
-        let toolchain = build_toolchain(project)?;
+        let toolchain = match build_toolchain(project) {
+            Ok(toolchain) => Some(toolchain),
+            Err(error) => {
+                warnings.push(format!(
+                    "{project}: could not load toolchain defaults; using Cargo's default toolchain: {error}"
+                ));
+                None
+            }
+        };
         let manifest = project.join("Cargo.toml");
         let mut command = MetadataCommand::new();
         command.manifest_path(manifest.as_std_path());
-        command.env("RUSTUP_TOOLCHAIN", toolchain);
+        command.no_deps();
+        if let Some(toolchain) = &toolchain {
+            command.env("RUSTUP_TOOLCHAIN", toolchain.clone());
+        }
         let metadata = command.exec().map_err(|error| PolicyError::Cargo {
             code: "DP201",
             message: format!("{}: {}", project, error),
@@ -164,15 +185,18 @@ pub fn scan_projects(projects: &[Utf8PathBuf]) -> Result<Inventory, PolicyError>
                 })
             })
             .collect();
-        let resolved = metadata
-            .packages
-            .iter()
-            .map(|package| crate::ResolvedPackage {
-                name: package.name.to_string(),
-                version: package.version.clone(),
-                source: package.source.as_ref().map(ToString::to_string),
-            })
-            .collect();
+        let mut resolved_command = MetadataCommand::new();
+        resolved_command.manifest_path(manifest.as_std_path());
+        if let Some(toolchain) = toolchain {
+            resolved_command.env("RUSTUP_TOOLCHAIN", toolchain);
+        }
+        let resolved = match resolved_command.exec() {
+            Ok(metadata) => crate::cargo::resolved_packages(&metadata),
+            Err(error) => {
+                warnings.push(format!("{project}: dependency resolution failed: {error}"));
+                Vec::new()
+            }
+        };
         scanned.push(InventoryProject {
             project: project.clone(),
             packages,
@@ -206,6 +230,7 @@ pub fn scan_projects(projects: &[Utf8PathBuf]) -> Result<Inventory, PolicyError>
         projects: scanned,
         direct_requirements: observed,
         conflicts,
+        warnings,
     })
 }
 
@@ -273,6 +298,7 @@ mod tests {
             projects: Vec::new(),
             direct_requirements: BTreeMap::from([("serde".into(), vec!["^1.0".into()])]),
             conflicts: BTreeMap::new(),
+            warnings: Vec::new(),
         };
 
         let json = render_inventory_json(&inventory).expect("inventory JSON");
