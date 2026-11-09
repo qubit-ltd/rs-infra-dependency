@@ -134,6 +134,15 @@ pub enum Command {
         #[arg(long)]
         dry_run: bool,
     },
+    /// Update prefixed dependencies from crates.io or newer local crates.
+    UpdatePrefix {
+        /// Crate name prefix. Repeat to select multiple prefixes.
+        #[arg(long = "prefix", required = true, action = clap::ArgAction::Append)]
+        prefixes: Vec<String>,
+        /// Print the planned manifest edits without writing files.
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 /// Output formats supported by report.
@@ -161,6 +170,7 @@ impl Cli {
             Command::Check => "check",
             Command::Report { .. } => "report",
             Command::Sync { .. } => "sync",
+            Command::UpdatePrefix { .. } => "update-prefix",
         }
     }
 
@@ -190,6 +200,13 @@ impl Cli {
     ///
     /// Returns `Ok(())` after the command completes successfully.
     pub fn execute(&self) -> Result<(), PolicyError> {
+        if let Command::UpdatePrefix { prefixes, dry_run } = &self.command {
+            return crate::prefix_update::update_prefix_dependencies(
+                &self.project,
+                prefixes,
+                *dry_run,
+            );
+        }
         if let Command::Inventory { roots, format, output } = &self.command {
             let inventory = scan_projects(roots)?;
             let text = match format {
@@ -217,6 +234,9 @@ impl Cli {
         };
         match &self.command {
             Command::Inventory { .. } => unreachable!("inventory handled before baseline loading"),
+            Command::UpdatePrefix { .. } => {
+                unreachable!("prefix update handled before baseline loading")
+            }
             Command::Check => {
                 let mut violations = 0;
                 for project in &projects {

@@ -18,6 +18,7 @@ mod config;
 pub mod diagnostic;
 pub mod inventory;
 mod policy_error;
+mod prefix_update;
 pub mod report;
 pub mod rules;
 pub mod source;

@@ -94,6 +94,12 @@ pub enum PolicyError {
         /// Human-readable synchronization failure detail.
         message: String,
     },
+    /// Prefix-based dependency update failed.
+    #[error("[DP302] {message}")]
+    PrefixUpdate {
+        /// Human-readable update failure detail.
+        message: String,
+    },
 }
 
 impl PolicyError {
@@ -119,6 +125,7 @@ impl PolicyError {
             Self::PolicyViolation { .. } => "DP200",
             Self::Unsupported { .. } => "DP105",
             Self::Sync { .. } => "DP301",
+            Self::PrefixUpdate { .. } => "DP302",
         }
     }
 }
