@@ -14,6 +14,7 @@ use std::process::Command;
 use camino::Utf8Path;
 use camino::Utf8PathBuf;
 use semver::Version;
+use semver::VersionReq;
 use toml_edit::DocumentMut;
 use toml_edit::InlineTable;
 use toml_edit::Item;
@@ -235,6 +236,9 @@ fn update_dependency_table(
             latest_versions.insert(package.clone(), latest_stable_version(&package)?);
         }
         let latest = latest_versions.get(&package).cloned().flatten();
+        if local.is_none() && latest.is_none() && has_prerelease_requirement(item) {
+            continue;
+        }
         let (source, version) = match (local, latest) {
             (Some(local), Some(latest)) if local.version > latest => (
                 DependencySource::Path(relative_path(manifest_dir, &local.path)?),
@@ -287,6 +291,22 @@ fn dependency_path(item: &Item) -> Option<Utf8PathBuf> {
         .and_then(|table| table.get("path"))
         .and_then(Item::as_str)
         .map(Utf8PathBuf::from)
+}
+
+fn has_prerelease_requirement(item: &Item) -> bool {
+    let requirement = item.as_str().or_else(|| {
+        dependency_table(item)
+            .and_then(|table| table.get("version"))
+            .and_then(Item::as_str)
+    });
+    requirement
+        .and_then(|requirement| VersionReq::parse(requirement).ok())
+        .is_some_and(|requirement| {
+            requirement
+                .comparators
+                .iter()
+                .any(|comparator| !comparator.pre.is_empty())
+        })
 }
 
 fn uses_workspace_dependency(item: &Item) -> bool {
@@ -486,25 +506,25 @@ fn read_package(manifest: &Utf8Path) -> Result<Option<(String, Version)>, Policy
     let Ok(text) = std::fs::read_to_string(manifest.as_std_path()) else {
         return Ok(None);
     };
-    let Ok(document) = text.parse::<DocumentMut>() else {
+    let Ok(document) = toml::from_str::<toml::Value>(&text) else {
         return Ok(None);
     };
-    let Some(package) = document.get("package").and_then(Item::as_table_like) else {
+    let Some(package) = document.get("package").and_then(toml::Value::as_table) else {
         return Ok(None);
     };
-    let Some(name) = package.get("name").and_then(Item::as_str) else {
+    let Some(name) = package.get("name").and_then(toml::Value::as_str) else {
         return Ok(None);
     };
     let version = package
         .get("version")
-        .and_then(Item::as_str)
+        .and_then(toml::Value::as_str)
         .map(str::to_owned)
         .or_else(|| {
             let inherited = package
                 .get("version")
-                .and_then(Item::as_table_like)
+                .and_then(toml::Value::as_table)
                 .and_then(|item| item.get("workspace"))
-                .and_then(Item::as_bool)
+                .and_then(toml::Value::as_bool)
                 == Some(true);
             if inherited {
                 manifest.parent().and_then(workspace_version)
@@ -526,14 +546,14 @@ fn workspace_version(package_dir: &Utf8Path) -> Option<String> {
     while let Some(directory) = ancestor {
         let manifest = directory.join("Cargo.toml");
         if let Ok(text) = std::fs::read_to_string(manifest.as_std_path())
-            && let Ok(document) = text.parse::<DocumentMut>()
+            && let Ok(document) = toml::from_str::<toml::Value>(&text)
             && let Some(version) = document
                 .get("workspace")
-                .and_then(Item::as_table_like)
+                .and_then(toml::Value::as_table)
                 .and_then(|workspace| workspace.get("package"))
-                .and_then(Item::as_table_like)
+                .and_then(toml::Value::as_table)
                 .and_then(|package| package.get("version"))
-                .and_then(Item::as_str)
+                .and_then(toml::Value::as_str)
         {
             return Some(version.to_owned());
         }
@@ -583,14 +603,20 @@ fn latest_stable_version(package: &str) -> Result<Option<Version>, PolicyError> 
     let json: serde_json::Value = serde_json::from_str(body).map_err(|error| {
         update_error(format!("invalid crates.io response for {package}: {error}"))
     })?;
-    let version = json
+    let Some(version) = json
         .pointer("/crate/max_stable_version")
         .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| {
-            update_error(format!(
-                "crates.io response has no stable version for {package}"
-            ))
-        })?;
+    else {
+        if json
+            .pointer("/crate/max_stable_version")
+            .is_some_and(serde_json::Value::is_null)
+        {
+            return Ok(None);
+        }
+        return Err(update_error(format!(
+            "crates.io response has no stable version for {package}"
+        )));
+    };
     let version = Version::parse(version).map_err(|error| {
         update_error(format!("invalid crates.io version for {package}: {error}"))
     })?;
