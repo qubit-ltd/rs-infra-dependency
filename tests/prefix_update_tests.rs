@@ -31,6 +31,60 @@ fn fake_crates_io(temp: &tempfile::TempDir, version: &str) -> std::path::PathBuf
 }
 
 #[cfg(unix)]
+fn fake_missing_crates_io(temp: &tempfile::TempDir) -> std::path::PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+
+    let bin = temp.path().join("bin");
+    fs::create_dir_all(&bin).expect("bin directory");
+    let curl = bin.join("curl");
+    fs::write(&curl, "#!/bin/sh\nprintf '{}\\n404'\n").expect("fake curl");
+    fs::set_permissions(&curl, fs::Permissions::from_mode(0o755)).expect("executable curl");
+    bin
+}
+
+#[cfg(unix)]
+#[test]
+fn resolves_nested_declared_path_when_crate_has_no_crates_io_release() {
+    let temp = tempfile::tempdir().expect("temporary directory");
+    let root = Utf8Path::from_path(temp.path()).expect("UTF-8 temp path");
+    let project = root.join("project");
+    let local_crate = project.join("tests/internal/process-watchdog");
+    fs::create_dir_all(&local_crate).expect("nested local crate directory");
+    write_crate(&project, "root-crate", "0.1.0");
+    write_crate(&local_crate, "qubit-executor-test-watchdog", "0.0.1");
+    fs::write(
+        project.join("Cargo.toml"),
+        "[package]\nname = \"root-crate\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[dev-dependencies]\nqubit-executor-test-watchdog = { path = \"tests/internal/process-watchdog\" }\n",
+    )
+    .expect("root manifest");
+    let bin = fake_missing_crates_io(&temp);
+    let mut paths = vec![bin];
+    paths.extend(std::env::split_paths(
+        &std::env::var_os("PATH").expect("PATH"),
+    ));
+    let output = Command::new(env!("CARGO_BIN_EXE_rs-infra-dependency"))
+        .args(["--project"])
+        .arg(project.as_str())
+        .args(["update-prefix", "--prefix", "qubit-", "--dry-run"])
+        .env("PATH", std::env::join_paths(paths).expect("joined PATH"))
+        .output()
+        .expect("run prefix updater");
+
+    assert!(
+        output.status.success(),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("path tests/internal/process-watchdog"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("version = \"^0.0\""), "{stdout}");
+}
+
+#[cfg(unix)]
 #[test]
 fn updates_fixture_to_newer_local_crate_and_preserves_other_fields() {
     let temp = tempfile::tempdir().expect("temporary directory");
