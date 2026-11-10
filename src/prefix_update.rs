@@ -135,7 +135,7 @@ fn update_document(
     manifest_dir: &Utf8Path,
     prefixes: &[String],
     latest_versions: &mut HashMap<String, Option<Version>>,
-    local_crates: &mut HashMap<(Utf8PathBuf, String), Option<LocalCrate>>,
+    local_crates: &mut HashMap<(Utf8PathBuf, String, Option<Utf8PathBuf>), Option<LocalCrate>>,
     changes: &mut Vec<Change>,
 ) -> Result<(), PolicyError> {
     for table_name in ["dependencies", "dev-dependencies", "build-dependencies"] {
@@ -204,7 +204,7 @@ fn update_dependency_table(
     manifest_dir: &Utf8Path,
     prefixes: &[String],
     latest_versions: &mut HashMap<String, Option<Version>>,
-    local_crates: &mut HashMap<(Utf8PathBuf, String), Option<LocalCrate>>,
+    local_crates: &mut HashMap<(Utf8PathBuf, String, Option<Utf8PathBuf>), Option<LocalCrate>>,
     changes: &mut Vec<Change>,
 ) -> Result<(), PolicyError> {
     let names: Vec<_> = table.iter().map(|(name, _)| name.to_owned()).collect();
@@ -218,9 +218,17 @@ fn update_dependency_table(
         {
             continue;
         }
-        let cache_key = (manifest_dir.to_owned(), package.clone());
+        let declared_path = dependency_path(item);
+        let cache_key = (
+            manifest_dir.to_owned(),
+            package.clone(),
+            declared_path.clone(),
+        );
         if !local_crates.contains_key(&cache_key) {
-            local_crates.insert(cache_key.clone(), find_local_crate(manifest_dir, &package)?);
+            local_crates.insert(
+                cache_key.clone(),
+                find_local_crate(manifest_dir, &package, declared_path.as_deref())?,
+            );
         }
         let local = local_crates.get(&cache_key).cloned().flatten();
         if !latest_versions.contains_key(&package) {
@@ -272,6 +280,13 @@ fn dependency_package_name(item: &Item, key: &str) -> String {
         .and_then(Item::as_str)
         .map(str::to_owned)
         .unwrap_or_else(|| key.to_owned())
+}
+
+fn dependency_path(item: &Item) -> Option<Utf8PathBuf> {
+    dependency_table(item)
+        .and_then(|table| table.get("path"))
+        .and_then(Item::as_str)
+        .map(Utf8PathBuf::from)
 }
 
 fn uses_workspace_dependency(item: &Item) -> bool {
@@ -397,8 +412,23 @@ fn discover_manifests(root: &Utf8Path) -> Result<Vec<Utf8PathBuf>, PolicyError> 
 fn find_local_crate(
     manifest_dir: &Utf8Path,
     package: &str,
+    declared_path: Option<&Utf8Path>,
 ) -> Result<Option<LocalCrate>, PolicyError> {
     let mut newest: Option<LocalCrate> = None;
+    if let Some(path) = declared_path {
+        let candidate_dir = manifest_dir.join(path);
+        let candidate_manifest = candidate_dir.join("Cargo.toml");
+        if candidate_manifest.is_file()
+            && let Some((candidate_name, version)) = read_package(&candidate_manifest)?
+            && candidate_name == package
+            && version.pre.is_empty()
+        {
+            newest = Some(LocalCrate {
+                path: candidate_dir,
+                version,
+            });
+        }
+    }
     let mut ancestor = Some(manifest_dir);
     while let Some(directory) = ancestor {
         let entries = std::fs::read_dir(directory.as_std_path()).map_err(|error| {
